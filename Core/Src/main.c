@@ -26,6 +26,8 @@
 #include "scheduler.h"
 #include <stdio.h>
 #include <stdbool.h>
+#include <time.h>
+#include <stdlib.h>
 
 
 /* USER CODE END Includes */
@@ -93,6 +95,8 @@ PUTCHAR_PROTOTYPE
 int main(void)
 {
 	/* USER CODE BEGIN 1 */
+
+	srand(time(NULL));
 
 	/* USER CODE END 1 */
 
@@ -203,18 +207,169 @@ int main(void)
 			.retry_counter = 0
 	};
 
+
+	command LTE_ftp_quit = {
+			.cmd = "AT+FTPQUIT",
+			.good_answer = "ANY",
+			.timeout = 2000,
+			.bad_answer = "ERROR",
+			.act_on_error = MOVE_ON,
+			.retry_counter = 0
+	};
+
+
+	command LTE_bearer_1 = {
+			.cmd = "AT+SAPBR=3,1,\"Contype\",\"GPRS\"",
+			.good_answer = "OK",
+			.timeout = 2000,
+			.bad_answer = "ERROR",
+			.act_on_error = MOVE_ON,
+			.retry_counter = 0
+	};
+
+	command LTE_bearer_2 = {
+			.cmd = "AT+SAPBR=3,1,\"APN\",\"internet\"",
+			.good_answer = "OK",
+			.timeout = 2000,
+			.bad_answer = "ERROR",
+			.act_on_error = MOVE_ON,
+			.retry_counter = 0
+	};
+
+	command LTE_bearer_3 = {
+			.cmd = "AT+SAPBR=1,1",
+			.good_answer = "OK",
+			.timeout = 2000,
+			.bad_answer = "ERROR",
+			.act_on_error = MOVE_ON,
+			.retry_counter = 0
+	};
+
+	command LTE_set_dns = {
+			.cmd = "AT+CDNSCFG=\"8.8.8.8\",\"8.8.4.4\"",
+			.good_answer = "OK",
+			.timeout = 2000,
+			.bad_answer = "ERROR",
+			.act_on_error = MOVE_ON,
+			.retry_counter = 0
+	};
+
+	command LTE_ftp_bearer = {
+			.cmd = "AT+FTPCID=1",
+			.good_answer = "OK",
+			.timeout = 2000,
+			.bad_answer = "ERROR",
+			.act_on_error = MOVE_ON,
+			.retry_counter = 0
+	};
+
+	command LTE_ftp_type = {
+			.cmd = "AT+FTPTYPE=\"A\"",
+			.good_answer = "OK",
+			.timeout = 2000,
+			.bad_answer = "ERROR",
+			.act_on_error = MOVE_ON,
+			.retry_counter = 0
+	};
+
+	command LTE_ftp_ip = {
+			.cmd = "AT+FTPSERV=\"188.210.221.82\"",
+			.good_answer = "OK",
+			.timeout = 2000,
+			.bad_answer = "ERROR",
+			.act_on_error = MOVE_ON,
+			.retry_counter = 0
+	};
+
+	command LTE_ftp_user = {
+			.cmd = "AT+FTPUN=\"ftp@unmanned.solutions\"",
+			.good_answer = "OK",
+			.timeout = 2000,
+			.bad_answer = "ERROR",
+			.act_on_error = MOVE_ON,
+			.retry_counter = 0
+	};
+
+	command LTE_ftp_pass = {
+			.cmd = "AT+FTPPW=\"cIzCm9jQ\"",
+			.good_answer = "OK",
+			.timeout = 2000,
+			.bad_answer = "ERROR",
+			.act_on_error = MOVE_ON,
+			.retry_counter = 0
+	};
+
+	command LTE_ftp_port = {
+			.cmd = "AT+FTPPORT=21",
+			.good_answer = "OK",
+			.timeout = 2000,
+			.bad_answer = "ERROR",
+			.act_on_error = MOVE_ON,
+			.retry_counter = 0
+	};
+
+
+	command LTE_ftp_path = {
+			.cmd = "AT+FTPPUTPATH=\"/\"",
+			.good_answer = "OK",
+			.timeout = 2000,
+			.bad_answer = "ERROR",
+			.act_on_error = MOVE_ON,
+			.retry_counter = 0
+	};
+
+	command LTE_get_time = {
+			.cmd = "AT+CCLK?",
+			.good_answer = "ANY",
+			.timeout = 2000,
+			.bad_answer = "ERROR",
+			.act_on_error = MOVE_ON,
+			.retry_counter = 0
+	};
+
+	char fileName[60] = "AT+FTPPUTNAME=\"unknown_";
+	char random[20];
+	itoa(rand(), random, 10);
+	strcat(fileName, random);
+	strcat(fileName, ".txt\"");
+
+
+	printf("\t\tFILE_RAND: %s\r\n", fileName);
+
+	command LTE_ftp_filename = {
+			.cmd = fileName,
+			.good_answer = "OK",
+			.timeout = 2000,
+			.bad_answer = "ERROR",
+			.act_on_error = MOVE_ON,
+			.retry_counter = 0
+	};
+
+	command LTE_ftp_put = {
+			.cmd = "AT+FTPPUT=1",
+			.good_answer = "+FTPPUT",
+			.timeout = 3000,
+			.bad_answer = "ERROR",
+			.act_on_error = MOVE_ON,
+			.retry_counter = 0
+	};
+
+
+
 	command LTE_reset_action = {
 			.cmd = "RESET_ACTION"
 	};
 
-	uint8_t last_action = 11;
 	uint8_t current_action = 0;
 
 	command action_list[255];
 
 
+	uint8_t last_action = 23;
+
 	action_list[0] = LTE_sim_check_active;
 	action_list[1] = LTE_deactivate_gprs;
+	//action_list[1] = LTE_get_time;
 	action_list[2] = LTE_attach_gprs;
 	action_list[3] = LTE_set_apn;
 	action_list[4] = LTE_gprs_up;
@@ -222,10 +377,22 @@ int main(void)
 	action_list[6] = LTE_init_gps;
 	action_list[7] = LTE_reset_action;
 	action_list[8] = LTE_get_position;
-	action_list[9] = LTE_get_position;
-	action_list[10] = LTE_get_position;
-	action_list[11] = LTE_get_position;
-	action_list[12] = LTE_reset_action;
+	action_list[9] = LTE_ftp_quit;
+	action_list[10] = LTE_bearer_1;
+	action_list[11] = LTE_bearer_2;
+	action_list[12] = LTE_bearer_3;
+	action_list[13] = LTE_set_dns;
+	action_list[14] = LTE_ftp_bearer;
+	action_list[15] = LTE_ftp_type;
+	action_list[16] = LTE_ftp_ip;
+	action_list[17] = LTE_ftp_user;
+	action_list[18] = LTE_ftp_pass;
+	action_list[19] = LTE_ftp_port;
+	action_list[20] = LTE_ftp_path;
+	action_list[21] = LTE_get_time;
+	action_list[22] = LTE_ftp_filename;
+	action_list[23] = LTE_ftp_put;
+
 
 
 
@@ -237,16 +404,6 @@ int main(void)
 
 	while (1)
 	{
-		//	  HAL_GPIO_TogglePin (GPIOA, GPIO_PIN_5);
-		//	  uint8_t Test[] = "Hello World !!!\r\n"; //Data to send
-		//  HAL_UART_Transmit(&huart2,Test,sizeof(Test),10);// Sending in normal mode
-		//	  HAL_Delay(500);
-
-
-		//	  while(current_action == last_action){
-		//		  printf("Code completed, forever loop\n");
-		//	  }
-
 
 		if(current_action >= last_action){
 			current_action = last_action;
@@ -299,6 +456,34 @@ int main(void)
 		{
 			UARTDMA_GetLineFromBuffer(&huartdma6, ParseBuffer);
 			printf("BUFFER: >>%s<<\r\n", (char*)ParseBuffer);
+
+			char* ptr;
+			if((ptr = strstr((char*)ParseBuffer, "+CCLK: ")) != NULL){
+				printf("\t\tTIME: %s\r\n", (char*)ParseBuffer);
+
+				char* timeString = ptr+8;
+
+				for (int i = 0; i < strlen(timeString); i++)
+				{
+					if ((timeString[i] > '9') || (timeString[i] < '0')){
+						timeString[i] = '_';
+					}
+					if(i>19){
+						timeString[i] = '\0';
+					}
+				}
+
+
+				char fileNameLocal[60] = "AT+FTPPUTNAME=\"";
+				strcat(fileNameLocal, timeString);
+				strcat(fileNameLocal, ".txt\"");
+
+				strcpy(LTE_ftp_filename.cmd, fileNameLocal);
+
+				printf("\t\tTIME_F: %s\r\n", fileNameLocal);
+
+			}
+
 		}else{
 			for(int i = 0; i< BUFFER_SIZE; i++){
 				ParseBuffer[i] ='\0';
