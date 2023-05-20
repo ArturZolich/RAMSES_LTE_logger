@@ -6,7 +6,7 @@ void Send_LTE(char* cmd){
 	//	strcat(cmd, "\r\n");
 	//printf("%s, %d - SIZEOF\r\n", cmd, strlen(cmd));
 	HAL_UART_Transmit(&huart2,(uint8_t*)cmd,strlen(cmd),10);
-	HAL_UART_Transmit(&huart2,(uint8_t*)"\r\n",2,10);
+	//HAL_UART_Transmit(&huart2,(uint8_t*)"\r\n",2,10);
 }
 
 void Get_LTE_data(){
@@ -18,6 +18,16 @@ enum State Do_Action(command cmd, uint8_t* uart_data){
 	static enum State state = READY;
 	static unsigned int retry;
 	static int start_time;
+
+	if(strcmp(cmd.cmd, "FTP_ACTIVE") == 0){
+		state = FTP_ACTIVE;
+		retry = 0;
+		for(int i = 0; i< BUFFER_SIZE; i++){
+			uart_data[i] ='\0';
+		}
+		return state;
+	}
+
 
 	if(strcmp(cmd.cmd, "RESET_ACTION") == 0){
 		state = READY;
