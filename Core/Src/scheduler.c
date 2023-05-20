@@ -5,7 +5,7 @@ void Send_LTE(char* cmd){
 	//printf("%s, %d - SIZEOF\r\n", (char*)cmd, sizeof(cmd));
 	//	strcat(cmd, "\r\n");
 	//printf("%s, %d - SIZEOF\r\n", cmd, strlen(cmd));
-	HAL_UART_Transmit(&huart2,(uint8_t*)cmd,strlen(cmd),10);
+	HAL_UART_Transmit(&huart2,(uint8_t*)cmd,strlen(cmd),250);
 	//HAL_UART_Transmit(&huart2,(uint8_t*)"\r\n",2,10);
 }
 

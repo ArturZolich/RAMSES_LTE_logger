@@ -24,7 +24,7 @@
 
 
 
-#define BUFFER_SIZE 1024
+#define BUFFER_SIZE 256
 
 
 extern UART_HandleTypeDef huart2;

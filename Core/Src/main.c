@@ -633,9 +633,15 @@ int main(void)
 					gps_data_latest[i] = '\0';
 				}
 
-				for(int i=0; i<strlen(ParseBuffer); i++){
-					gps_data_latest[i] = ParseBuffer[i];
+				gps_data_latest[0] = '#'; // preamble
+				for(int i=0; i<strlen(ParseBuffer)-1; i++){ // -1 because I added preamble
+					gps_data_latest[i+1] = ParseBuffer[i];
 				}
+
+				//char fake[BUFFER_SIZE] = "+CGNSINF: 5109.0262308,N,11401.8407342,203522.00,A,5109.0262308,N,11401.8407342,W,0.004,133.4,130522,0.0,E,D*2B";
+				//				for(int i=0; i<strlen(fake); i++){
+				//					gps_data_latest[i] = fake[i];
+				//				}
 
 				printf("GPS DATA LOCKED: %s\r\n", gps_data_latest);
 
