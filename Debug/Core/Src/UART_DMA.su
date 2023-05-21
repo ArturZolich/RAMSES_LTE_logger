@@ -1,6 +1,6 @@
 ../Core/Src/UART_DMA.c:18:6:UARTDMA_UartIrqHandler	24	static
 ../Core/Src/UART_DMA.c:33:6:UARTDMA_DmaIrqHandler	40	static
-../Core/Src/UART_DMA.c:83:5:UARTDMA_GetCharFromBuffer	16	static
-../Core/Src/UART_DMA.c:94:9:UARTDMA_IsDataReady	16	static
-../Core/Src/UART_DMA.c:102:5:UARTDMA_GetLineFromBuffer	24	static
-../Core/Src/UART_DMA.c:125:6:UARTDMA_Init	16	static
+../Core/Src/UART_DMA.c:85:5:UARTDMA_GetCharFromBuffer	16	static
+../Core/Src/UART_DMA.c:97:9:UARTDMA_IsDataReady	16	static
+../Core/Src/UART_DMA.c:105:5:UARTDMA_GetLineFromBuffer	24	static
+../Core/Src/UART_DMA.c:128:6:UARTDMA_Init	16	static

@@ -28,7 +28,7 @@
 #include <stdbool.h>
 #include <time.h>
 #include <stdlib.h>
-
+#include <string.h>
 
 /* USER CODE END Includes */
 
@@ -40,7 +40,13 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-UARTDMA_HandleTypeDef huartdma6;
+
+
+UARTDMA_HandleTypeDef hLTE_uart2dma6;
+UARTDMA_HandleTypeDef hRAM_1_uart1dma5;
+UARTDMA_HandleTypeDef hRAM_2_uart3dma3;
+
+
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -53,10 +59,410 @@ UART_HandleTypeDef huart4;
 UART_HandleTypeDef huart1;
 UART_HandleTypeDef huart2;
 UART_HandleTypeDef huart3;
+DMA_HandleTypeDef hdma_usart1_rx;
 DMA_HandleTypeDef hdma_usart2_rx;
+DMA_HandleTypeDef hdma_usart3_rx;
 
 /* USER CODE BEGIN PV */
-char ParseBuffer[BUFFER_SIZE];
+
+
+uint8_t g_LTE_ParseBuffer[BUFFER_SIZE];
+uint8_t g_RAM_1_ParseBuffer[BUFFER_SIZE];
+uint8_t g_RAM_2_ParseBuffer[BUFFER_SIZE];
+
+
+uint8_t g_fileName[60] = "AT+FTPPUTNAME=\"unknown_";
+
+uint8_t g_dataSize[20] = " AT+FTPPUT=2,0";
+
+uint8_t g_dataSizeResponse[20] = "+FTPPUT=2,0";
+
+
+uint8_t gps_data_latest[BUFFER_SIZE] = {};
+
+
+uint8_t RAM_1_data_latest[BUFFER_SIZE] = {};
+uint16_t g_RAM_1_data_size = 0;
+uint8_t g_RAM_1_data_ready = 0;
+uint8_t g_RAM_1_dataSize[20] = " AT+FTPPUT=2,0"; // buffer to prepare FTP for data
+uint8_t g_RAM_1_dataSizeResponse[20] = "+FTPPUT=2,0";
+int g_RAM_1_timer = 0;
+
+uint8_t RAM_2_data_latest[BUFFER_SIZE] = {};
+uint16_t g_RAM_2_data_size = 0;
+uint8_t g_RAM_2_data_ready = 0;
+uint8_t g_RAM_2_dataSize[20] = " AT+FTPPUT=2,0"; // buffer to prepare FTP for data
+uint8_t g_RAM_2_dataSizeResponse[20] = "+FTPPUT=2,0";
+int g_RAM_2_timer = 0;
+
+
+
+
+
+
+command LTE_sim_check_active = {
+		.cmd = (uint8_t*)"AT\r\n",
+		.length = 0, // zero indicate's it's a char. LTE_Send function handles it automatically
+		.good_answer = (uint8_t*)"OK",
+		.timeout = 2000,
+		.bad_answer = (uint8_t*)"ERROR",
+		.act_on_error = RETRY,
+		.retry_counter = 3
+};
+
+command LTE_disable_echo = {
+		.cmd = (uint8_t*)"ATE0\r\n",
+		.length = 0, // zero indicate's it's a char. LTE_Send function handles it automatically
+		.good_answer = (uint8_t*)"OK",
+		.timeout = 2000,
+		.bad_answer = (uint8_t*)"ERROR",
+		.act_on_error = RETRY,
+		.retry_counter = 3
+};
+
+
+
+command LTE_deactivate_gprs = {
+		.cmd = (uint8_t*)"AT+CIPSHUT\r\n",
+		.length = 0, // zero indicate's it's a char. LTE_Send function handles it automatically
+		.good_answer = (uint8_t*)"SHUT OK",
+		.timeout = 2000,
+		.bad_answer = (uint8_t*)"ERROR",
+		.act_on_error = RETRY,
+		.retry_counter = 3
+};
+
+
+command LTE_attach_gprs = {
+		.cmd = (uint8_t*)"AT+CGATT=1\r\n",
+		.length = 0, // zero indicate's it's a char. LTE_Send function handles it automatically
+		.good_answer = (uint8_t*)"OK",
+		.timeout = 2000,
+		.bad_answer = (uint8_t*)"ERROR",
+		.act_on_error = RETRY,
+		.retry_counter = 3
+};
+
+command LTE_set_apn = {
+		.cmd = (uint8_t*)"AT+CSTT=\"internet\",\"\",\"\"\r\n",
+		.length = 0, // zero indicate's it's a char. LTE_Send function handles it automatically
+		.good_answer = (uint8_t*)"OK",
+		.timeout = 5000,
+		.bad_answer = (uint8_t*)"ERROR",
+		.act_on_error = RETRY,
+		.retry_counter = 3
+};
+
+command LTE_gprs_up = {
+		.cmd = (uint8_t*)"AT+CIICR\r\n",
+		.length = 0, // zero indicate's it's a char. LTE_Send function handles it automatically
+		.good_answer = (uint8_t*)"OK",
+		.timeout = 5000,
+		.bad_answer = (uint8_t*)"ERROR",
+		.act_on_error = RETRY,
+		.retry_counter = 3
+};
+
+command LTE_get_ip = {
+		.cmd = (uint8_t*)"AT+CIFSR\r\n",
+		.length = 0, // zero indicate's it's a char. LTE_Send function handles it automatically
+		.good_answer = (uint8_t*)"ANY",
+		.timeout = 5000,
+		.bad_answer = (uint8_t*)"ERROR",
+		.act_on_error = RETRY,
+		.retry_counter = 3
+};
+
+
+command LTE_init_gps = {
+		.cmd = (uint8_t*)"AT+CGNSPWR=1\r\n",
+		.length = 0, // zero indicate's it's a char. LTE_Send function handles it automatically
+		.good_answer = (uint8_t*)"OK",
+		.timeout = 2000,
+		.bad_answer = (uint8_t*)"ERROR",
+		.act_on_error = RETRY,
+		.retry_counter = 3
+};
+
+command LTE_get_position = {
+		.cmd = (uint8_t*)"AT+CGNSINF\r\n",
+		.length = 0, // zero indicate's it's a char. LTE_Send function handles it automatically
+		.good_answer = (uint8_t*)"OK",
+		.timeout = 2000,
+		.bad_answer = (uint8_t*)"ERROR",
+		.act_on_error = RETRY,
+		.retry_counter = 0
+};
+
+
+command LTE_ftp_quit = {
+		.cmd = (uint8_t*)"AT+FTPQUIT\r\n",
+		.length = 0, // zero indicate's it's a char. LTE_Send function handles it automatically
+		.good_answer = (uint8_t*)"ANY",
+		.timeout = 2000,
+		.bad_answer = (uint8_t*)"ERROR",
+		.act_on_error = MOVE_ON,
+		.retry_counter = 0
+};
+
+
+command LTE_bearer_1 = {
+		.cmd = (uint8_t*)"AT+SAPBR=3,1,\"Contype\",\"GPRS\"\r\n",
+		.length = 0, // zero indicate's it's a char. LTE_Send function handles it automatically
+		.good_answer = (uint8_t*)"OK",
+		.timeout = 2000,
+		.bad_answer = (uint8_t*)"ERROR",
+		.act_on_error = MOVE_ON,
+		.retry_counter = 0
+};
+
+command LTE_bearer_2 = {
+		.cmd = (uint8_t*)"AT+SAPBR=3,1,\"APN\",\"internet\"\r\n",
+		.length = 0, // zero indicate's it's a char. LTE_Send function handles it automatically
+		.good_answer = (uint8_t*)"OK",
+		.timeout = 2000,
+		.bad_answer = (uint8_t*)"ERROR",
+		.act_on_error = MOVE_ON,
+		.retry_counter = 0
+};
+
+command LTE_bearer_3 = {
+		.cmd = (uint8_t*)"AT+SAPBR=1,1\r\n",
+		.length = 0, // zero indicate's it's a char. LTE_Send function handles it automatically
+		.good_answer = (uint8_t*)"OK",
+		.timeout = 2000,
+		.bad_answer = (uint8_t*)"ERROR",
+		.act_on_error = MOVE_ON,
+		.retry_counter = 0
+};
+
+command LTE_set_dns = {
+		.cmd = (uint8_t*)"AT+CDNSCFG=\"8.8.8.8\",\"8.8.4.4\"\r\n",
+		.length = 0, // zero indicate's it's a char. LTE_Send function handles it automatically
+		.good_answer = (uint8_t*)"OK",
+		.timeout = 2000,
+		.bad_answer = (uint8_t*)"ERROR",
+		.act_on_error = MOVE_ON,
+		.retry_counter = 0
+};
+
+command LTE_ftp_bearer = {
+		.cmd = (uint8_t*)"AT+FTPCID=1\r\n",
+		.length = 0, // zero indicate's it's a char. LTE_Send function handles it automatically
+		.good_answer = (uint8_t*)"OK",
+		.timeout = 2000,
+		.bad_answer = (uint8_t*)"ERROR",
+		.act_on_error = MOVE_ON,
+		.retry_counter = 0
+};
+
+command LTE_ftp_type_binary = {
+		.cmd = (uint8_t*)"AT+FTPTYPE=\"I\"\r\n",
+		.length = 0, // zero indicate's it's a char. LTE_Send function handles it automatically
+		.good_answer = (uint8_t*)"OK",
+		.timeout = 2000,
+		.bad_answer = (uint8_t*)"ERROR",
+		.act_on_error = MOVE_ON,
+		.retry_counter = 0
+};
+
+command LTE_ftp_append = {
+		.cmd = (uint8_t*)"AT+FTPPUTOPT=\"APPE\"\r\n",
+		.length = 0, // zero indicate's it's a char. LTE_Send function handles it automatically
+		.good_answer = (uint8_t*)"OK",
+		.timeout = 2000,
+		.bad_answer = (uint8_t*)"ERROR",
+		.act_on_error = MOVE_ON,
+		.retry_counter = 0
+};
+
+command LTE_ftp_ip = {
+		.cmd = (uint8_t*)"AT+FTPSERV=\"188.210.221.82\"\r\n",
+		.length = 0, // zero indicate's it's a char. LTE_Send function handles it automatically
+		.good_answer = (uint8_t*)"OK",
+		.timeout = 2000,
+		.bad_answer = (uint8_t*)"ERROR",
+		.act_on_error = MOVE_ON,
+		.retry_counter = 0
+};
+
+command LTE_ftp_user = {
+		.cmd = (uint8_t*)"AT+FTPUN=\"ftp@unmanned.solutions\"\r\n",
+		.length = 0, // zero indicate's it's a char. LTE_Send function handles it automatically
+		.good_answer = (uint8_t*)"OK",
+		.timeout = 2000,
+		.bad_answer = (uint8_t*)"ERROR",
+		.act_on_error = MOVE_ON,
+		.retry_counter = 0
+};
+
+command LTE_ftp_pass = {
+		.cmd = (uint8_t*)"AT+FTPPW=\"cIzCm9jQ\"\r\n",
+		.length = 0, // zero indicate's it's a char. LTE_Send function handles it automatically
+		.good_answer = (uint8_t*)"OK",
+		.timeout = 2000,
+		.bad_answer = (uint8_t*)"ERROR",
+		.act_on_error = MOVE_ON,
+		.retry_counter = 0
+};
+
+command LTE_ftp_port = {
+		.cmd = (uint8_t*)"AT+FTPPORT=21\r\n",
+		.length = 0, // zero indicate's it's a char. LTE_Send function handles it automatically
+		.good_answer = (uint8_t*)"OK",
+		.timeout = 2000,
+		.bad_answer = (uint8_t*)"ERROR",
+		.act_on_error = MOVE_ON,
+		.retry_counter = 0
+};
+
+
+command LTE_ftp_path = {
+		.cmd = (uint8_t*)"AT+FTPPUTPATH=\"/\"\r\n",
+		.length = 0, // zero indicate's it's a char. LTE_Send function handles it automatically
+		.good_answer = (uint8_t*)"OK",
+		.timeout = 2000,
+		.bad_answer = (uint8_t*)"ERROR",
+		.act_on_error = MOVE_ON,
+		.retry_counter = 0
+};
+
+command LTE_get_time = {
+		.cmd = (uint8_t*)"AT+CCLK?\r\n",
+		.length = 0, // zero indicate's it's a char. LTE_Send function handles it automatically
+		.good_answer = (uint8_t*)"OK",
+		.timeout = 5000,
+		.bad_answer = (uint8_t*)"ERROR",
+		.act_on_error = MOVE_ON,
+		.retry_counter = 0
+};
+
+command LTE_ftp_filename = {
+		.cmd = g_fileName,
+		.length = 0, // zero indicate's it's a char. LTE_Send function handles it automatically
+		.good_answer = (uint8_t*)"OK",
+		.timeout = 5000,
+		.bad_answer = (uint8_t*)"ERROR",
+		.act_on_error = MOVE_ON,
+		.retry_counter = 0
+};
+
+command LTE_ftp_start_put = {
+		.cmd = (uint8_t*)"AT+FTPPUT=1\r\n",
+		.length = 0, // zero indicate's it's a char. LTE_Send function handles it automatically
+		.good_answer = (uint8_t*)"+FTPPUT: 1,1,1360",
+		.timeout = 10000,
+		.bad_answer = (uint8_t*)"+FTPPUT: 1,66",
+		.act_on_error = RESET_PROCESSOR,
+		.retry_counter = 0
+};
+
+command LTE_ftp_put_data_size = {
+		.cmd = g_dataSize,
+		.length = 0, // zero indicate's it's a char. LTE_Send function handles it automatically
+		.good_answer = g_dataSizeResponse,
+		.timeout = 4000,
+		.bad_answer = (uint8_t*)"ERROR",
+		.act_on_error = RESET_PROCESSOR,
+		.retry_counter = 0
+};
+
+command LTE_ftp_put_data = {
+		.cmd = gps_data_latest,
+		.length = 0, // zero indicate's it's a char. LTE_Send function handles it automatically
+		.good_answer = (uint8_t*)"OK",
+		.timeout = 4000,
+		.bad_answer = (uint8_t*)"ERROR",
+		.act_on_error = RESET_PROCESSOR,
+		.retry_counter = 0
+};
+
+
+command LTE_ftp_end_put = {
+		.cmd = (uint8_t*)"AT+FTPPUT=2,0\r\n",
+		.length = 0, // zero indicate's it's a char. LTE_Send function handles it automatically
+		.good_answer = (uint8_t*)"OK",
+		.timeout = 5000,
+		.bad_answer = (uint8_t*)"ERROR",
+		.act_on_error = RESET_PROCESSOR,
+		.retry_counter = 0
+};
+
+// SIGNAL commands
+command LTE_ftp_active = {
+		.cmd = (uint8_t*)"FTP_ACTIVE"
+};
+
+command LTE_reset_action = {
+		.cmd = (uint8_t*)"RESET_ACTION"
+};
+
+
+command RAM_1_query = {
+		.cmd = (uint8_t*)"RAMSES_1_QUERY"
+};
+
+
+command RAM_1_sample = {
+		.cmd = (uint8_t*)"RAMSES_1_SAMPLE"
+};
+
+command RAM_2_query = {
+		.cmd = (uint8_t*)"RAMSES_2_QUERY"
+};
+
+command RAM_2_sample = {
+		.cmd = (uint8_t*)"RAMSES_2_SAMPLE"
+};
+
+command RAM_1_2_sample = {
+		.cmd = (uint8_t*)"RAMSES_1_2_SAMPLE"
+};
+
+
+command LTE_ftp_put_RAM_1_data_size = {
+		.cmd = g_RAM_1_dataSize,
+		.length = 0, // zero indicate's it's a char. LTE_Send function handles it automatically
+		.good_answer = g_RAM_1_dataSizeResponse,
+		.timeout = 4000,
+		.bad_answer = (uint8_t*)"ERROR",
+		.act_on_error = RESET_PROCESSOR,
+		.retry_counter = 0
+};
+
+command LTE_ftp_put_RAM_2_data_size = {
+		.cmd = g_dataSize,
+		.length = 0, // zero indicate's it's a char. LTE_Send function handles it automatically
+		.good_answer = g_RAM_2_dataSizeResponse,
+		.timeout = 4000,
+		.bad_answer = (uint8_t*)"ERROR",
+		.act_on_error = RESET_PROCESSOR,
+		.retry_counter = 0
+};
+
+command LTE_ftp_put_RAM_1_data = {  // sizeof will not work here
+		.cmd = RAM_1_data_latest,
+		.length = -1, // that's a bitfield
+		.good_answer = (uint8_t*)"OK",
+		.timeout = 4000,
+		.bad_answer = (uint8_t*)"ERROR",
+		.act_on_error = RESET_PROCESSOR,
+		.retry_counter = 0
+};
+
+command LTE_ftp_put_RAM_2_data = { // sizeof will not work here
+		.cmd = RAM_2_data_latest,
+		.length = -1, // that's a bitfield
+		.good_answer = (uint8_t*)"OK",
+		.timeout = 4000,
+		.bad_answer = (uint8_t*)"ERROR",
+		.act_on_error = RESET_PROCESSOR,
+		.retry_counter = 0
+};
+
+
+
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -126,312 +532,43 @@ int main(void)
 	MX_USART3_UART_Init();
 	/* USER CODE BEGIN 2 */
 
-	UARTDMA_Init(&huartdma6, &huart2);
+	UARTDMA_Init(&hLTE_uart2dma6, &huart2); // receives LTE modem serial
+	UARTDMA_Init(&hRAM_1_uart1dma5, &huart1); // receives RAMSES 1 serial
+	UARTDMA_Init(&hRAM_2_uart3dma3, &huart3); // receives RAMSES 2 serial
+
 	/* USER CODE END 2 */
 
 	/* Infinite loop */
 	/* USER CODE BEGIN WHILE */
 
 
-
-
-	command LTE_sim_check_active = {
-			.cmd = "AT\r\n",
-			.good_answer = "OK",
-			.timeout = 2000,
-			.bad_answer = "ERROR",
-			.act_on_error = RETRY,
-			.retry_counter = 3
-	};
-
-	command LTE_disable_echo = {
-			.cmd = "ATE0\r\n",
-			.good_answer = "OK",
-			.timeout = 2000,
-			.bad_answer = "ERROR",
-			.act_on_error = RETRY,
-			.retry_counter = 3
-	};
-
-
-
-	command LTE_deactivate_gprs = {
-			.cmd = "AT+CIPSHUT\r\n",
-			.good_answer = "SHUT OK",
-			.timeout = 2000,
-			.bad_answer = "ERROR",
-			.act_on_error = RETRY,
-			.retry_counter = 3
-	};
-
-
-	command LTE_attach_gprs = {
-			.cmd = "AT+CGATT=1\r\n",
-			.good_answer = "OK",
-			.timeout = 2000,
-			.bad_answer = "ERROR",
-			.act_on_error = RETRY,
-			.retry_counter = 3
-	};
-
-	command LTE_set_apn = {
-			.cmd = "AT+CSTT=\"internet\",\"\",\"\"\r\n",
-			.good_answer = "OK",
-			.timeout = 5000,
-			.bad_answer = "ERROR",
-			.act_on_error = RETRY,
-			.retry_counter = 3
-	};
-
-	command LTE_gprs_up = {
-			.cmd = "AT+CIICR\r\n",
-			.good_answer = "OK",
-			.timeout = 5000,
-			.bad_answer = "ERROR",
-			.act_on_error = RETRY,
-			.retry_counter = 3
-	};
-
-	command LTE_get_ip = {
-			.cmd = "AT+CIFSR\r\n",
-			.good_answer = "ANY",
-			.timeout = 5000,
-			.bad_answer = "ERROR",
-			.act_on_error = RETRY,
-			.retry_counter = 3
-	};
-
-
-	command LTE_init_gps = {
-			.cmd = "AT+CGNSPWR=1\r\n",
-			.good_answer = "OK",
-			.timeout = 2000,
-			.bad_answer = "ERROR",
-			.act_on_error = RETRY,
-			.retry_counter = 3
-	};
-
-	command LTE_get_position = {
-			.cmd = "AT+CGNSINF\r\n",
-			.good_answer = "OK",
-			.timeout = 2000,
-			.bad_answer = "ERROR",
-			.act_on_error = RETRY,
-			.retry_counter = 0
-	};
-
-
-	command LTE_ftp_quit = {
-			.cmd = "AT+FTPQUIT\r\n",
-			.good_answer = "ANY",
-			.timeout = 2000,
-			.bad_answer = "ERROR",
-			.act_on_error = MOVE_ON,
-			.retry_counter = 0
-	};
-
-
-	command LTE_bearer_1 = {
-			.cmd = "AT+SAPBR=3,1,\"Contype\",\"GPRS\"\r\n",
-			.good_answer = "OK",
-			.timeout = 2000,
-			.bad_answer = "ERROR",
-			.act_on_error = MOVE_ON,
-			.retry_counter = 0
-	};
-
-	command LTE_bearer_2 = {
-			.cmd = "AT+SAPBR=3,1,\"APN\",\"internet\"\r\n",
-			.good_answer = "OK",
-			.timeout = 2000,
-			.bad_answer = "ERROR",
-			.act_on_error = MOVE_ON,
-			.retry_counter = 0
-	};
-
-	command LTE_bearer_3 = {
-			.cmd = "AT+SAPBR=1,1\r\n",
-			.good_answer = "OK",
-			.timeout = 2000,
-			.bad_answer = "ERROR",
-			.act_on_error = MOVE_ON,
-			.retry_counter = 0
-	};
-
-	command LTE_set_dns = {
-			.cmd = "AT+CDNSCFG=\"8.8.8.8\",\"8.8.4.4\"\r\n",
-			.good_answer = "OK",
-			.timeout = 2000,
-			.bad_answer = "ERROR",
-			.act_on_error = MOVE_ON,
-			.retry_counter = 0
-	};
-
-	command LTE_ftp_bearer = {
-			.cmd = "AT+FTPCID=1\r\n",
-			.good_answer = "OK",
-			.timeout = 2000,
-			.bad_answer = "ERROR",
-			.act_on_error = MOVE_ON,
-			.retry_counter = 0
-	};
-
-	command LTE_ftp_type_binary = {
-			.cmd = "AT+FTPTYPE=\"I\"\r\n",
-			.good_answer = "OK",
-			.timeout = 2000,
-			.bad_answer = "ERROR",
-			.act_on_error = MOVE_ON,
-			.retry_counter = 0
-	};
-
-	command LTE_ftp_append = {
-			.cmd = "AT+FTPPUTOPT=\"APPE\"\r\n",
-			.good_answer = "OK",
-			.timeout = 2000,
-			.bad_answer = "ERROR",
-			.act_on_error = MOVE_ON,
-			.retry_counter = 0
-	};
-
-	command LTE_ftp_ip = {
-			.cmd = "AT+FTPSERV=\"188.210.221.82\"\r\n",
-			.good_answer = "OK",
-			.timeout = 2000,
-			.bad_answer = "ERROR",
-			.act_on_error = MOVE_ON,
-			.retry_counter = 0
-	};
-
-	command LTE_ftp_user = {
-			.cmd = "AT+FTPUN=\"ftp@unmanned.solutions\"\r\n",
-			.good_answer = "OK",
-			.timeout = 2000,
-			.bad_answer = "ERROR",
-			.act_on_error = MOVE_ON,
-			.retry_counter = 0
-	};
-
-	command LTE_ftp_pass = {
-			.cmd = "AT+FTPPW=\"cIzCm9jQ\"\r\n",
-			.good_answer = "OK",
-			.timeout = 2000,
-			.bad_answer = "ERROR",
-			.act_on_error = MOVE_ON,
-			.retry_counter = 0
-	};
-
-	command LTE_ftp_port = {
-			.cmd = "AT+FTPPORT=21\r\n",
-			.good_answer = "OK",
-			.timeout = 2000,
-			.bad_answer = "ERROR",
-			.act_on_error = MOVE_ON,
-			.retry_counter = 0
-	};
-
-
-	command LTE_ftp_path = {
-			.cmd = "AT+FTPPUTPATH=\"/\"\r\n",
-			.good_answer = "OK",
-			.timeout = 2000,
-			.bad_answer = "ERROR",
-			.act_on_error = MOVE_ON,
-			.retry_counter = 0
-	};
-
-	command LTE_get_time = {
-			.cmd = "AT+CCLK?\r\n",
-			.good_answer = "OK",
-			.timeout = 5000,
-			.bad_answer = "ERROR",
-			.act_on_error = MOVE_ON,
-			.retry_counter = 0
-	};
-
-	char g_fileName[60] = "AT+FTPPUTNAME=\"unknown_";
-
-	char g_dataSize[20] = " AT+FTPPUT=2,0";
-
-	char g_dataSizeResponse[20] = "+FTPPUT=2,0";
-
-
-	char gps_data_latest[BUFFER_SIZE] = {};
-
-
-	char random[20];
+	char random[20]; 				// create an initial file name, in case LTE won't get time fix
 	itoa(rand(), random, 10);
-	strcat(g_fileName, random);
-	strcat(g_fileName, ".txt\"\r\n");
+	strcat((char*)g_fileName, random);
+	strcat((char*)g_fileName, ".txt\"\r\n");
 
 
 	printf("\t\tFILE_RAND: %s\r\n", g_fileName);
 
-	command LTE_ftp_filename = {
-			.cmd = g_fileName,
-			.good_answer = "OK",
-			.timeout = 5000,
-			.bad_answer = "ERROR",
-			.act_on_error = MOVE_ON,
-			.retry_counter = 0
-	};
-
-	command LTE_ftp_start_put = {
-			.cmd = "AT+FTPPUT=1\r\n",
-			.good_answer = "+FTPPUT: 1,1,1360",
-			.timeout = 10000,
-			.bad_answer = "+FTPPUT: 1,66",
-			.act_on_error = RESET_PROCESSOR,
-			.retry_counter = 0
-	};
-
-	command LTE_ftp_put_data_size = {
-			.cmd = g_dataSize,
-			.good_answer = g_dataSizeResponse,
-			.timeout = 4000,
-			.bad_answer = "ERROR",
-			.act_on_error = RESET_PROCESSOR,
-			.retry_counter = 0
-	};
-
-	command LTE_ftp_put_data = {
-			.cmd = gps_data_latest,
-			.good_answer = "OK",
-			.timeout = 4000,
-			.bad_answer = "ERROR",
-			.act_on_error = RESET_PROCESSOR,
-			.retry_counter = 0
-	};
 
 
-	command LTE_ftp_end_put = {
-			.cmd = "AT+FTPPUT=2,0\r\n",
-			.good_answer = "OK",
-			.timeout = 5000,
-			.bad_answer = "ERROR",
-			.act_on_error = RESET_PROCESSOR,
-			.retry_counter = 0
-	};
-
-	// SIGNAL commands
-	command LTE_ftp_active = {
-			.cmd = "FTP_ACTIVE"
-	};
-
-	command LTE_reset_action = {
-			.cmd = "RESET_ACTION"
-	};
-
-	uint8_t current_action = 0;
-
-	uint8_t filename_time_set = 0;
-
-	uint8_t transfer_status = 0;
-
-	command action_list[255];
+	// query, sample, dataSize, data
 
 
-	uint8_t last_action = 34;
+	uint8_t current_action = 0; // currently executed action
+
+	uint8_t filename_time_set = 0; // flag to see if random file name was updated with LTE time
+
+	//uint8_t transfer_status = 0;
+
+	command action_list[255]; // list of actions to perform
+
+	uint8_t last_action = 34; // number of the last action we want to execute
+
+	uint8_t startup = 0; // flag to see if we just reset the processor to check LTE modem - if it is On or Off
+
+	int resolution = 0; // reduces amount of printf, helpful in case there's no delay between loops
+
 
 	action_list[0] = LTE_sim_check_active;
 	action_list[1] = LTE_disable_echo;
@@ -446,6 +583,25 @@ int main(void)
 	action_list[10] = LTE_bearer_2;
 	action_list[11] = LTE_bearer_3;
 	action_list[12] = LTE_set_dns;
+
+	// action_list[] = RAM_1_query;
+	// action_list[] = RAM_2_query;
+
+	// action_list[] = LTE_ftp_put_RAM_1_data_size;
+	// action_list[] = LTE_ftp_put_RAM_2_data_size;
+
+	// action_list[] = RAM_1_send_LTE;
+	// action_list[] = RAM_2_send_LTE;
+
+	// action_list[] = RAM_1_sample;
+	// action_list[] = RAM_2_sample;
+
+	// action_list[] = LTE_ftp_put_RAM_1_data_size;
+	// action_list[] = LTE_ftp_put_RAM_2_data_size;
+
+	// action_list[] = RAM_1_send_LTE;
+	// action_list[] = RAM_2_send_LTE;
+
 	action_list[13] = LTE_get_position;
 	action_list[14] = LTE_get_time;
 	action_list[15] = LTE_ftp_quit;
@@ -476,22 +632,13 @@ int main(void)
 	//uint8_t ftp_transfer_active = 0;
 
 
-
-	uint8_t startup = 0;
-
-	for(int i = 0; i< BUFFER_SIZE; i++){
-		ParseBuffer[i] ='\0';
-	}
-
-	int resolution = 0;
+	Clear_Array(g_LTE_ParseBuffer, BUFFER_SIZE); // let's start with clean LTE buffer
 
 	while (1)
 	{
 
 		if(current_action > last_action){
-			for(int i = 0; i< BUFFER_SIZE; i++){
-				ParseBuffer[i] ='\0';
-			}
+			Clear_Array(g_LTE_ParseBuffer, BUFFER_SIZE);
 			current_action = 29;
 		}
 
@@ -500,14 +647,14 @@ int main(void)
 			printf("TRYING: >>%s<<\r\n", action_list[current_action].cmd);
 		}
 
-		enum State state = Do_Action(action_list[current_action], (uint8_t*)ParseBuffer);
+		enum State state = Do_Action(action_list[current_action], g_LTE_ParseBuffer);
 		resolution++;
 
 		switch (state){
 		case GOOD_ANSWER:
 			printf("%s - %s\r\n", action_list[current_action].cmd, action_list[current_action].good_answer);
-			printf("\tREPLY: >>%s<<\r\n", (char*)ParseBuffer);
-			Do_Action(LTE_reset_action, (uint8_t*)ParseBuffer);
+			printf("\tREPLY: >>%s<<\r\n", (char*)g_LTE_ParseBuffer);
+			Do_Action(LTE_reset_action, g_LTE_ParseBuffer);
 			current_action++;
 			HAL_Delay(action_list[current_action].timeout / 2);
 			startup = 5;
@@ -515,7 +662,7 @@ int main(void)
 			break;
 		case READY:
 			//printf("%s - READY\r\n", action_list[current_action].cmd);
-			//printf("BUFFER: >>%s<<\r\n", (char*)ParseBuffer);
+			//printf("BUFFER: >>%s<<\r\n", (char*)LTE_ParseBuffer);
 			current_action++;
 			resolution = 0;
 			break;
@@ -530,7 +677,7 @@ int main(void)
 				HAL_Delay(5000);
 				startup++;
 			}
-			Do_Action(LTE_reset_action, (uint8_t*)ParseBuffer);
+			Do_Action(LTE_reset_action, (uint8_t*)g_LTE_ParseBuffer);
 
 			HAL_Delay(action_list[current_action].timeout);
 			current_action=0;
@@ -538,7 +685,7 @@ int main(void)
 			break;
 		case BAD_ANSWER:
 			printf("%s - %s\r\n", action_list[current_action].cmd, action_list[current_action].bad_answer);
-			Do_Action(LTE_reset_action, (uint8_t*)ParseBuffer);
+			Do_Action(LTE_reset_action, (uint8_t*)g_LTE_ParseBuffer);
 			HAL_Delay(action_list[current_action].timeout);
 			startup = 5;
 			resolution = 0;
@@ -550,17 +697,58 @@ int main(void)
 			break;
 		};
 
-		if(UARTDMA_IsDataReady(&huartdma6))
+
+		if(hRAM_1_uart1dma5.UartTransferCompleted == 1)
 		{
-			UARTDMA_GetLineFromBuffer(&huartdma6, ParseBuffer);
-			printf("\tBUFFER: >>%s<<\r\n", (char*)ParseBuffer);
+			// remember about timeout
+
+
+//			char TempChar;
+//			int count = 0;
+//			uint8_t* LinePointer = RAM_1_data_latest;
+//
+//			while(hRAM_1_uart1dma5.UartTransferCompleted != 0){
+//				TempChar = UARTDMA_GetCharFromBuffer(&hRAM_1_uart1dma5);
+//
+//				*LinePointer = TempChar;
+//				LinePointer++;
+//				count++;
+//			}
+//
+//			g_RAM_1_data_size = count;
+//
+//			char save[100] = "AT+FTPPUT=2,";
+//			char len[5];
+//			itoa(g_RAM_1_data_size, len, 10);
+//			strcat(save, len);
+//			strcat(save, "\r\n");
+//
+//			strcpy((char*)g_RAM_1_dataSize, save);
+//
+//			char save2[100] = "+FTPPUT: 2,";
+//			strcat(save2, len);
+//
+//			strcpy((char*)g_RAM_1_dataSizeResponse, save2);
+//
+//			g_RAM_1_data_ready = 1;
+		}
+
+		if(hRAM_2_uart3dma3.UartTransferCompleted)
+		{
+
+		}
+
+		if(UARTDMA_IsDataReady(&hLTE_uart2dma6))
+		{
+			UARTDMA_GetLineFromBuffer(&hLTE_uart2dma6, (char*)g_LTE_ParseBuffer);
+			printf("\tBUFFER: >>%s<<\r\n", (char*)g_LTE_ParseBuffer);
 
 			// if message is time, update FTP filename
 			char* ptr;
-			if((ptr = strstr((char*)ParseBuffer, "+CCLK: ")) != NULL){
-				printf("\t\tTIME: %s\r\n", (char*)ParseBuffer);
+			if((ptr = strstr((char*)g_LTE_ParseBuffer, "+CCLK: ")) != NULL){
+				printf("\t\tTIME: %s\r\n", (char*)g_LTE_ParseBuffer);
 
-				strcat(gps_data_latest,ParseBuffer); // append GPS data with LTE time
+				strcat((char*)gps_data_latest,(char*)g_LTE_ParseBuffer); // append GPS data with LTE time
 				//strcat(gps_data_latest,"\r\n");
 
 				printf("GPS BUFFER AT TIME: %s\r\n", gps_data_latest);
@@ -589,22 +777,22 @@ int main(void)
 
 					printf("\tFILENAME_TIME_CHANGE: %s\r\n", fileNameLocal);
 
-					strcpy(g_fileName, fileNameLocal);
+					strcpy((char*)g_fileName, fileNameLocal);
 
 				}
 
 				char save[100] = "AT+FTPPUT=2,";
 				char len[5];
-				itoa(strlen(gps_data_latest), len, 10);
+				itoa(strlen((char*)gps_data_latest), len, 10);
 				strcat(save, len);
 				strcat(save, "\r\n");
 
-				strcpy(g_dataSize, save);
+				strcpy((char*)g_dataSize, save);
 
 				char save2[100] = "+FTPPUT: 2,";
 				strcat(save2, len);
 
-				strcpy(g_dataSizeResponse, save2);
+				strcpy((char*)g_dataSizeResponse, save2);
 
 				printf("\tASSERT_EXPECTED_REPLY: %s\r\n", g_dataSizeResponse);
 
@@ -621,21 +809,19 @@ int main(void)
 				//				}
 
 
-			}else if((ptr = strstr((char*)ParseBuffer, "+FTPPUT: 1,1,")) != NULL){ // else, if message is FTP server ready for data response
+			}else if((ptr = strstr((char*)g_LTE_ParseBuffer, "+FTPPUT: 1,1,")) != NULL){ // else, if message is FTP server ready for data response
 				//ftp_transfer_active = 1;
-				transfer_status++;
+				//transfer_status++;
 				printf("FTP #: %d\r\n", atoi(ptr+13));
-			}else if((ptr = strstr((char*)ParseBuffer, "+CGNSINF")) != NULL){ // save GPS data
+			}else if((ptr = strstr((char*)g_LTE_ParseBuffer, "+CGNSINF")) != NULL){ // save GPS data
 				//ftp_transfer_active = 0;
 				//transfer_status = 0; // I receive new GPS data, which means I don't transmit
 
-				for(int i=0; i<BUFFER_SIZE; i++){ // clean old data
-					gps_data_latest[i] = '\0';
-				}
+				Clear_Array(gps_data_latest, BUFFER_SIZE); // clean old entries
 
 				gps_data_latest[0] = '#'; // preamble
-				for(int i=0; i<strlen(ParseBuffer)-1; i++){ // -1 because I added preamble
-					gps_data_latest[i+1] = ParseBuffer[i];
+				for(int i=0; i<strlen((char*)g_LTE_ParseBuffer)-1; i++){ // -1 because I added preamble
+					gps_data_latest[i+1] = g_LTE_ParseBuffer[i];
 				}
 
 				//char fake[BUFFER_SIZE] = "+CGNSINF: 5109.0262308,N,11401.8407342,203522.00,A,5109.0262308,N,11401.8407342,W,0.004,133.4,130522,0.0,E,D*2B";
@@ -648,9 +834,7 @@ int main(void)
 			}
 
 		}else{
-			for(int i = 0; i< BUFFER_SIZE; i++){
-				ParseBuffer[i] ='\0';
-			}
+			Clear_Array(g_LTE_ParseBuffer, BUFFER_SIZE);
 		}
 
 
@@ -849,6 +1033,12 @@ static void MX_DMA_Init(void)
 	__HAL_RCC_DMA1_CLK_ENABLE();
 
 	/* DMA interrupt init */
+	/* DMA1_Channel3_IRQn interrupt configuration */
+	HAL_NVIC_SetPriority(DMA1_Channel3_IRQn, 0, 0);
+	HAL_NVIC_EnableIRQ(DMA1_Channel3_IRQn);
+	/* DMA1_Channel5_IRQn interrupt configuration */
+	HAL_NVIC_SetPriority(DMA1_Channel5_IRQn, 0, 0);
+	HAL_NVIC_EnableIRQ(DMA1_Channel5_IRQn);
 	/* DMA1_Channel6_IRQn interrupt configuration */
 	HAL_NVIC_SetPriority(DMA1_Channel6_IRQn, 0, 0);
 	HAL_NVIC_EnableIRQ(DMA1_Channel6_IRQn);

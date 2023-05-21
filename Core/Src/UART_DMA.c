@@ -72,6 +72,8 @@ void UARTDMA_DmaIrqHandler(UARTDMA_HandleTypeDef *huartdma)
 			}
 		}
 
+		huartdma->UartTransferCompleted = 1;
+
 
 		DmaRegisters->IFCR = 0x0FU << huartdma->huart->hdmarx->ChannelIndex; 		// Clear all interrupts
 		huartdma->huart->hdmarx->Instance->CMAR = (uint32_t) huartdma->DMA_RX_Buffer; // Set memory address for DMA again
@@ -84,6 +86,7 @@ int UARTDMA_GetCharFromBuffer(UARTDMA_HandleTypeDef *huartdma)
 {
 	if(huartdma->UartBufferHead == huartdma->UartBufferTail)
 	{
+		huartdma->UartTransferCompleted = 0;
 		return -1; // error - no char to return
 	}
 	huartdma->UartBufferTail = (huartdma->UartBufferTail + 1) % UART_BUFFER_SIZE;

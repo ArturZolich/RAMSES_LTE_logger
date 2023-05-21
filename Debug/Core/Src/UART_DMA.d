@@ -24,7 +24,7 @@ Core/Src/UART_DMA.o: ../Core/Src/UART_DMA.c ../Core/Inc/UART_DMA.h \
  ../Drivers/STM32L1xx_HAL_Driver/Inc/stm32l1xx_hal_pwr_ex.h \
  ../Drivers/STM32L1xx_HAL_Driver/Inc/stm32l1xx_hal_uart.h \
  ../Drivers/STM32L1xx_HAL_Driver/Inc/stm32l1xx_hal_exti.h \
- ../Core/Inc/scheduler.h ../Core/Inc/UART_DMA.h
+ ../Core/Inc/scheduler.h
 ../Core/Inc/UART_DMA.h:
 ../Core/Inc/main.h:
 ../Drivers/STM32L1xx_HAL_Driver/Inc/stm32l1xx_hal.h:
@@ -53,4 +53,3 @@ Core/Src/UART_DMA.o: ../Core/Src/UART_DMA.c ../Core/Inc/UART_DMA.h \
 ../Drivers/STM32L1xx_HAL_Driver/Inc/stm32l1xx_hal_uart.h:
 ../Drivers/STM32L1xx_HAL_Driver/Inc/stm32l1xx_hal_exti.h:
 ../Core/Inc/scheduler.h:
-../Core/Inc/UART_DMA.h:
