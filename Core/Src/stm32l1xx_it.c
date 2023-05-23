@@ -63,7 +63,9 @@ extern UART_HandleTypeDef huart1;
 extern UART_HandleTypeDef huart2;
 extern UART_HandleTypeDef huart3;
 /* USER CODE BEGIN EV */
+extern UARTDMA_HandleTypeDef hRAM_1_uart1dma5;
 extern UARTDMA_HandleTypeDef hLTE_uart2dma6;
+extern UARTDMA_HandleTypeDef hRAM_2_uart3dma3;
 /* USER CODE END EV */
 
 /******************************************************************************/
@@ -210,7 +212,8 @@ void SysTick_Handler(void)
 void DMA1_Channel3_IRQHandler(void)
 {
   /* USER CODE BEGIN DMA1_Channel3_IRQn 0 */
-
+	  UARTDMA_DmaIrqHandler(&hRAM_2_uart3dma3);
+	  return;
   /* USER CODE END DMA1_Channel3_IRQn 0 */
   HAL_DMA_IRQHandler(&hdma_usart3_rx);
   /* USER CODE BEGIN DMA1_Channel3_IRQn 1 */
@@ -224,7 +227,8 @@ void DMA1_Channel3_IRQHandler(void)
 void DMA1_Channel5_IRQHandler(void)
 {
   /* USER CODE BEGIN DMA1_Channel5_IRQn 0 */
-
+	  UARTDMA_DmaIrqHandler(&hRAM_1_uart1dma5);
+	  return;
   /* USER CODE END DMA1_Channel5_IRQn 0 */
   HAL_DMA_IRQHandler(&hdma_usart1_rx);
   /* USER CODE BEGIN DMA1_Channel5_IRQn 1 */
@@ -253,7 +257,8 @@ void DMA1_Channel6_IRQHandler(void)
 void USART1_IRQHandler(void)
 {
   /* USER CODE BEGIN USART1_IRQn 0 */
-
+	  UARTDMA_UartIrqHandler(&hRAM_1_uart1dma5);
+	  return;
   /* USER CODE END USART1_IRQn 0 */
   HAL_UART_IRQHandler(&huart1);
   /* USER CODE BEGIN USART1_IRQn 1 */
@@ -282,7 +287,8 @@ void USART2_IRQHandler(void)
 void USART3_IRQHandler(void)
 {
   /* USER CODE BEGIN USART3_IRQn 0 */
-
+	  UARTDMA_UartIrqHandler(&hRAM_2_uart3dma3);
+	  return;
   /* USER CODE END USART3_IRQn 0 */
   HAL_UART_IRQHandler(&huart3);
   /* USER CODE BEGIN USART3_IRQn 1 */

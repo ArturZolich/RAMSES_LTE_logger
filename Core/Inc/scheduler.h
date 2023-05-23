@@ -20,7 +20,9 @@
 
 
 
-#define BUFFER_SIZE 256
+#define BUFFER_SIZE 1024
+
+#define RAMSES_TIMEOUT 12000
 
 
 #define QUERY_CMD_SIZE 8

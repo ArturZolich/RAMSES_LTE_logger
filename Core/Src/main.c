@@ -81,14 +81,14 @@ uint8_t g_dataSizeResponse[20] = "+FTPPUT=2,0";
 uint8_t gps_data_latest[BUFFER_SIZE] = {};
 
 
-uint8_t RAM_1_data_latest[BUFFER_SIZE] = {};
+uint8_t g_RAM_1_data_latest[BUFFER_SIZE] = {};
 uint16_t g_RAM_1_data_size = 0;
 uint8_t g_RAM_1_data_ready = 0;
 uint8_t g_RAM_1_dataSize[20] = " AT+FTPPUT=2,0"; // buffer to prepare FTP for data
 uint8_t g_RAM_1_dataSizeResponse[20] = "+FTPPUT=2,0";
 int g_RAM_1_timer = 0;
 
-uint8_t RAM_2_data_latest[BUFFER_SIZE] = {};
+uint8_t g_RAM_2_data_latest[BUFFER_SIZE] = {};
 uint16_t g_RAM_2_data_size = 0;
 uint8_t g_RAM_2_data_ready = 0;
 uint8_t g_RAM_2_dataSize[20] = " AT+FTPPUT=2,0"; // buffer to prepare FTP for data
@@ -229,7 +229,8 @@ command LTE_bearer_2 = {
 command LTE_bearer_3 = {
 		.cmd = (uint8_t*)"AT+SAPBR=1,1\r\n",
 		.length = 0, // zero indicate's it's a char. LTE_Send function handles it automatically
-		.good_answer = (uint8_t*)"OK",
+		//.good_answer = (uint8_t*)"OK",
+		.good_answer = (uint8_t*)"ANY",
 		.timeout = 2000,
 		.bad_answer = (uint8_t*)"ERROR",
 		.act_on_error = MOVE_ON,
@@ -370,7 +371,8 @@ command LTE_ftp_put_data_size = {
 command LTE_ftp_put_data = {
 		.cmd = gps_data_latest,
 		.length = 0, // zero indicate's it's a char. LTE_Send function handles it automatically
-		.good_answer = (uint8_t*)"OK",
+		//.good_answer = (uint8_t*)"OK",
+		.good_answer = (uint8_t*)"+FTPPUT: 1,1,1360",
 		.timeout = 4000,
 		.bad_answer = (uint8_t*)"ERROR",
 		.act_on_error = RESET_PROCESSOR,
@@ -441,9 +443,10 @@ command LTE_ftp_put_RAM_2_data_size = {
 };
 
 command LTE_ftp_put_RAM_1_data = {  // sizeof will not work here
-		.cmd = RAM_1_data_latest,
+		.cmd = g_RAM_1_data_latest,
 		.length = -1, // that's a bitfield
-		.good_answer = (uint8_t*)"OK",
+		.good_answer = (uint8_t*)"+FTPPUT: 1,1,1360",
+		//.good_answer = (uint8_t*)"OK",
 		.timeout = 4000,
 		.bad_answer = (uint8_t*)"ERROR",
 		.act_on_error = RESET_PROCESSOR,
@@ -451,9 +454,10 @@ command LTE_ftp_put_RAM_1_data = {  // sizeof will not work here
 };
 
 command LTE_ftp_put_RAM_2_data = { // sizeof will not work here
-		.cmd = RAM_2_data_latest,
+		.cmd = g_RAM_2_data_latest,
 		.length = -1, // that's a bitfield
-		.good_answer = (uint8_t*)"OK",
+		//.good_answer = (uint8_t*)"OK",
+		.good_answer = (uint8_t*)"+FTPPUT: 1,1,1360",
 		.timeout = 4000,
 		.bad_answer = (uint8_t*)"ERROR",
 		.act_on_error = RESET_PROCESSOR,
@@ -483,7 +487,7 @@ static void MX_USART3_UART_Init(void);
 
 PUTCHAR_PROTOTYPE
 {
-	HAL_UART_Transmit(&huart1, (uint8_t *)&ch, 1, HAL_MAX_DELAY);
+	HAL_UART_Transmit(&huart4, (uint8_t *)&ch, 1, HAL_MAX_DELAY);
 	return ch;
 }
 
@@ -563,7 +567,6 @@ int main(void)
 
 	command action_list[255]; // list of actions to perform
 
-	uint8_t last_action = 34; // number of the last action we want to execute
 
 	uint8_t startup = 0; // flag to see if we just reset the processor to check LTE modem - if it is On or Off
 
@@ -584,49 +587,93 @@ int main(void)
 	action_list[11] = LTE_bearer_3;
 	action_list[12] = LTE_set_dns;
 
-	// action_list[] = RAM_1_query;
-	// action_list[] = RAM_2_query;
+	action_list[13] = RAM_1_query;
+	action_list[14] = RAM_1_query;/// WARNING ZOLICH RAM 2!!!!!!
 
-	// action_list[] = LTE_ftp_put_RAM_1_data_size;
-	// action_list[] = LTE_ftp_put_RAM_2_data_size;
+	action_list[15] = LTE_get_position;
+	action_list[16] = LTE_get_time;
 
-	// action_list[] = RAM_1_send_LTE;
-	// action_list[] = RAM_2_send_LTE;
+	action_list[17] = LTE_ftp_quit;
+	action_list[18] = LTE_ftp_bearer;
+	action_list[19] = LTE_ftp_type_binary;
+	action_list[20] = LTE_ftp_append;
+	action_list[21] = LTE_ftp_ip;
+	action_list[22] = LTE_ftp_user;
+	action_list[23] = LTE_ftp_pass;
+	action_list[24] = LTE_ftp_port;
+	action_list[25] = LTE_ftp_path;
+	action_list[26] = LTE_ftp_filename;
+
+	action_list[27] = LTE_ftp_start_put;
+	action_list[28] = LTE_ftp_put_data_size;
+	action_list[29] = LTE_ftp_put_data;
+
+
+	action_list[30] = LTE_ftp_put_RAM_1_data_size;
+	action_list[31] = LTE_ftp_put_RAM_1_data;
+
+	action_list[32] = LTE_ftp_put_RAM_1_data_size;   /// WARNING ZOLICH RAM 2!!!!!!
+	action_list[33] = LTE_ftp_put_RAM_1_data;
+
+	action_list[34] = LTE_ftp_end_put;
+
+	// sample loop cycle below
+
+	action_list[35] = RAM_1_sample;
+	action_list[36] = RAM_1_sample;/// WARNING ZOLICH RAM 2!!!!!!
+
+
+	action_list[37] = LTE_get_position;
+	action_list[38] = LTE_get_time;
+
+
+	action_list[39] = LTE_ftp_start_put;
+	action_list[40] = LTE_ftp_put_data_size;
+	action_list[41] = LTE_ftp_put_data;
+
+	action_list[42] = LTE_ftp_put_RAM_1_data_size;
+	action_list[43] = LTE_ftp_put_RAM_1_data;
+
+	action_list[44] = LTE_ftp_put_RAM_1_data_size;   /// WARNING ZOLICH RAM 2!!!!!!
+	action_list[45] = LTE_ftp_put_RAM_1_data;
+
+	action_list[46] = LTE_ftp_end_put;
+
+	action_list[47] = LTE_reset_action;
+
+
+	uint8_t last_action = 47; // number of the last action we want to execute
+	uint8_t cycle_start_action = 35; // number of the last action we want to execute
+
+
+
+
+	//
+	//	action_list[17] = LTE_ftp_start_put;
+	//	action_list[18] = LTE_ftp_put_RAM_1_data_size;
+	//	action_list[19] = RAM_1_send_LTE;
+	//
+	//	action_list[20] = LTE_ftp_start_put;
+	//	action_list[21] = LTE_ftp_put_RAM_2_data_size;
+	//	action_list[22] = RAM_2_send_LTE;
+
 
 	// action_list[] = RAM_1_sample;
 	// action_list[] = RAM_2_sample;
 
+	// action_list[] = LTE_ftp_start_put;
 	// action_list[] = LTE_ftp_put_RAM_1_data_size;
-	// action_list[] = LTE_ftp_put_RAM_2_data_size;
-
 	// action_list[] = RAM_1_send_LTE;
+
+	// action_list[] = LTE_ftp_start_put;
+	// action_list[] = LTE_ftp_put_RAM_2_data_size;
 	// action_list[] = RAM_2_send_LTE;
 
-	action_list[13] = LTE_get_position;
-	action_list[14] = LTE_get_time;
-	action_list[15] = LTE_ftp_quit;
-	action_list[16] = LTE_ftp_bearer;
-	action_list[17] = LTE_ftp_type_binary;
-	action_list[18] = LTE_ftp_append;
-	action_list[19] = LTE_ftp_ip;
-	action_list[20] = LTE_ftp_user;
-	action_list[21] = LTE_ftp_pass;
-	action_list[22] = LTE_ftp_port;
-	action_list[23] = LTE_ftp_path;
-	action_list[24] = LTE_ftp_filename;
-	action_list[25] = LTE_ftp_start_put;
-	action_list[26] = LTE_ftp_put_data_size;
-	action_list[27] = LTE_ftp_put_data;
-	action_list[28] = LTE_ftp_end_put;
 
-	action_list[29] = LTE_get_position;
-	action_list[30] = LTE_get_time;
-	action_list[31] = LTE_ftp_start_put;
-	action_list[32] = LTE_ftp_put_data_size;
-	action_list[33] = LTE_ftp_put_data;
-	action_list[34] = LTE_ftp_end_put;
 
-	action_list[35] = LTE_reset_action;
+
+
+
 
 
 	//uint8_t ftp_transfer_active = 0;
@@ -634,25 +681,36 @@ int main(void)
 
 	Clear_Array(g_LTE_ParseBuffer, BUFFER_SIZE); // let's start with clean LTE buffer
 
+
+	hRAM_1_uart1dma5.UartTransferCompleted = 0;
+	hRAM_2_uart3dma3.UartTransferCompleted = 0;
+
 	while (1)
 	{
 
 		if(current_action > last_action){
 			Clear_Array(g_LTE_ParseBuffer, BUFFER_SIZE);
-			current_action = 29;
+			current_action = cycle_start_action;
 		}
 
 
 		if((resolution % 50) == 0){
-			printf("TRYING: >>%s<<\r\n", action_list[current_action].cmd);
+			//printf("TRYING: >>%s<<\r\n", action_list[current_action].cmd);
+			printf("TRYING: >>%d<<\r\n", current_action);
 		}
 
 		enum State state = Do_Action(action_list[current_action], g_LTE_ParseBuffer);
 		resolution++;
 
+		//uint8_t query[] = { 0x23, 0x00, 0x00, 0x80, 0xB0, 0x00, 0x00, 0x01 };
+		//uint8_t query[] = { 0x23, 0x00, 0x00, 0x00, 0xA8, 0x00, 0x81, 0x01 };
+
 		switch (state){
 		case GOOD_ANSWER:
-			printf("%s - %s\r\n", action_list[current_action].cmd, action_list[current_action].good_answer);
+			//HAL_UART_Transmit(&huart1, query, SAMPLE_CMD_SIZE, 500);
+			//HAL_UART_Transmit(&huart3, sam, SAMPLE_CMD_SIZE, 500);
+
+			//printf("%s - %s\r\n", action_list[current_action].cmd, action_list[current_action].good_answer);
 			printf("\tREPLY: >>%s<<\r\n", (char*)g_LTE_ParseBuffer);
 			Do_Action(LTE_reset_action, g_LTE_ParseBuffer);
 			current_action++;
@@ -700,43 +758,58 @@ int main(void)
 
 		if(hRAM_1_uart1dma5.UartTransferCompleted == 1)
 		{
+			printf("\t\t\t\tRAMSES_1\r\n");
 			// remember about timeout
 
 
-//			char TempChar;
-//			int count = 0;
-//			uint8_t* LinePointer = RAM_1_data_latest;
-//
-//			while(hRAM_1_uart1dma5.UartTransferCompleted != 0){
-//				TempChar = UARTDMA_GetCharFromBuffer(&hRAM_1_uart1dma5);
-//
-//				*LinePointer = TempChar;
-//				LinePointer++;
-//				count++;
-//			}
-//
-//			g_RAM_1_data_size = count;
-//
-//			char save[100] = "AT+FTPPUT=2,";
-//			char len[5];
-//			itoa(g_RAM_1_data_size, len, 10);
-//			strcat(save, len);
-//			strcat(save, "\r\n");
-//
-//			strcpy((char*)g_RAM_1_dataSize, save);
-//
-//			char save2[100] = "+FTPPUT: 2,";
-//			strcat(save2, len);
-//
-//			strcpy((char*)g_RAM_1_dataSizeResponse, save2);
-//
-//			g_RAM_1_data_ready = 1;
+			int tmpByte;
+			int count = 0;
+			//uint8_t* LinePointer = g_RAM_1_data_latest;
+
+			while((tmpByte = UARTDMA_GetCharFromBuffer(&hRAM_1_uart1dma5)) != -1){ // it use a feature that I read 8 bit data, so I can use 16bit negative to detect end of queue
+			//	*LinePointer = (uint8_t) tmpByte;
+			//	LinePointer++;
+				//printf("\t\t\t\tRAMSES_1: >>%c<<\r\n", (char)tmpByte);
+				printf("\t\t\t\t\tRAMSES_1: >>%d<<\r\n", count);
+				g_RAM_1_data_latest[count]= (uint8_t)tmpByte;
+				count++;
+			}
+			//g_RAM_1_data_latest[count]= '\0';
+			printf("\t\t\t\tRAMSES_1: >>%d<<\r\n", count);
+
+			g_RAM_1_data_size = count;
+
+			char save[100] = "AT+FTPPUT=2,";
+			char len[10];
+			itoa(g_RAM_1_data_size, len, 10);
+			strcat(save, len);
+			strcat(save, "\r\n");
+
+			strcpy((char*)g_RAM_1_dataSize, save);
+
+			char save2[100] = "+FTPPUT: 2,";
+			strcat(save2, len);
+
+			strcpy((char*)g_RAM_1_dataSizeResponse, save2);
+
+			g_RAM_1_data_ready = 1;
 		}
 
-		if(hRAM_2_uart3dma3.UartTransferCompleted)
+		if(hRAM_2_uart3dma3.UartTransferCompleted == 1)
 		{
+			printf("\t\t\t\tRAMSES_2\r\n");
 
 		}
+
+
+		if((g_RAM_1_timer + RAMSES_TIMEOUT) > HAL_GetTick()){
+			// RAMSES timeout
+			// if no response, report timeout
+		}
+		if((g_RAM_2_timer + RAMSES_TIMEOUT) > HAL_GetTick()){
+			// RAMSES timeout
+		}
+
 
 		if(UARTDMA_IsDataReady(&hLTE_uart2dma6))
 		{
@@ -940,7 +1013,7 @@ static void MX_USART1_UART_Init(void)
 
 	/* USER CODE END USART1_Init 1 */
 	huart1.Instance = USART1;
-	huart1.Init.BaudRate = 115200;
+	huart1.Init.BaudRate = 9600;
 	huart1.Init.WordLength = UART_WORDLENGTH_8B;
 	huart1.Init.StopBits = UART_STOPBITS_1;
 	huart1.Init.Parity = UART_PARITY_NONE;
@@ -1006,7 +1079,7 @@ static void MX_USART3_UART_Init(void)
 
 	/* USER CODE END USART3_Init 1 */
 	huart3.Instance = USART3;
-	huart3.Init.BaudRate = 115200;
+	huart3.Init.BaudRate = 9600;
 	huart3.Init.WordLength = UART_WORDLENGTH_8B;
 	huart3.Init.StopBits = UART_STOPBITS_1;
 	huart3.Init.Parity = UART_PARITY_NONE;

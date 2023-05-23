@@ -35,31 +35,35 @@ enum State Do_Action_RAMSES(const command *cmd) {
 	// DO RAMSES ACTION
 	if (strcmp((char*)cmd->cmd, "RAMSES_1_2_SAMPLE") == 0)
 	{
-		HAL_UART_Transmit(&huart1, g_RAMSES_Sample, SAMPLE_CMD_SIZE, 10);
+		HAL_UART_Transmit(&huart1, g_RAMSES_Sample, SAMPLE_CMD_SIZE, 50);
 		g_RAM_1_timer = HAL_GetTick();
-		HAL_UART_Transmit(&huart3, g_RAMSES_Sample, SAMPLE_CMD_SIZE, 10);
+		HAL_UART_Transmit(&huart3, g_RAMSES_Sample, SAMPLE_CMD_SIZE, 50);
 		g_RAM_2_timer = HAL_GetTick();
 		return READY;
 	} else if (strcmp((char*)cmd->cmd, "RAMSES_1_SAMPLE") == 0)
 	{
-		HAL_UART_Transmit(&huart1, g_RAMSES_Sample, SAMPLE_CMD_SIZE, 10);
+		printf("\t\t\t\tRAMSES_1_SAMPLE\r\n");
+		HAL_UART_Transmit(&huart1, g_RAMSES_Sample, SAMPLE_CMD_SIZE, 50);
 		g_RAM_1_timer = HAL_GetTick();
 		return READY;
 
 	} else if (strcmp((char*)cmd->cmd, "RAMSES_2_SAMPLE") == 0)
 	{
-		HAL_UART_Transmit(&huart3, g_RAMSES_Sample, SAMPLE_CMD_SIZE, 10);
+		printf("\t\t\t\tRAMSES_2_SAMPLE\r\n");
+		HAL_UART_Transmit(&huart3, g_RAMSES_Sample, SAMPLE_CMD_SIZE, 50);
 		g_RAM_2_timer = HAL_GetTick();
 		return READY;
 
 	} else if (strcmp((char*)cmd->cmd, "RAMSES_1_QUERY") == 0)
 	{
-		HAL_UART_Transmit(&huart1, g_RAMSES_Query, QUERY_CMD_SIZE, 10);
+		printf("\t\t\t\tRAMSES_1_QUERY\r\n");
+		HAL_UART_Transmit(&huart1, g_RAMSES_Query, QUERY_CMD_SIZE, 50);
 		g_RAM_1_timer = HAL_GetTick();
 		return READY;
 	} else if (strcmp((char*)cmd->cmd, "RAMSES_2_QUERY") == 0)
 	{
-		HAL_UART_Transmit(&huart3, g_RAMSES_Query, QUERY_CMD_SIZE, 10);
+		printf("\t\t\t\tRAMSES_2_QUERY\r\n");
+		HAL_UART_Transmit(&huart3, g_RAMSES_Query, QUERY_CMD_SIZE, 50);
 		g_RAM_2_timer = HAL_GetTick();
 		return READY;
 	}
@@ -74,7 +78,7 @@ enum State Do_Action(command cmd, uint8_t* uart_data){
 	static unsigned int retry;
 	static int start_time;
 
-	if(strstr((char*)uart_data, "RAMSES") != NULL){ // DO RAMSES ACTION
+	if(strstr((char*)cmd.cmd, "RAMSES") != NULL){ // DO RAMSES ACTION
 		state = Do_Action_RAMSES(&cmd);
 		return state;
 
@@ -93,7 +97,12 @@ enum State Do_Action(command cmd, uint8_t* uart_data){
 			state = CHECKING_ANSWER;			// notify that now we wait for a reply
 			retry = 0;
 			Clear_Array(uart_data, BUFFER_SIZE);  // ZOLICH _ modified without test
-			Send_LTE(cmd.cmd, cmd.length);				// send new command
+			if(cmd.length != -1){
+				Send_LTE(cmd.cmd, cmd.length);				// send new command
+			}else{
+				printf("NO DATA TO TRANSFER, LENGTH -1, SKIPPING\r\n");
+				state = READY;
+			}
 			return state;
 
 		}else if(state == CHECKING_ANSWER){	// if we expect a reply now
