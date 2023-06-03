@@ -9,6 +9,11 @@
 const uint8_t g_RAMSES_Query[] = { 0x23, 0x00, 0x00, 0x80, 0xB0, 0x00, 0x00, 0x01 };
 const uint8_t g_RAMSES_Sample[] = { 0x23, 0x00, 0x00, 0x00, 0xA8, 0x00, 0x81, 0x01 };
 
+extern uint8_t g_RAM_1_data_ready;
+extern uint8_t g_RAM_2_data_ready;
+
+extern uint8_t g_RAM_1_triggered;
+extern uint8_t g_RAM_2_triggered;
 
 void Send_LTE(uint8_t* cmd, uint16_t len){
 	if (len == 0){ // lenghts of arrays of chars can be computed here
@@ -37,14 +42,21 @@ enum State Do_Action_RAMSES(const command *cmd) {
 	{
 		HAL_UART_Transmit(&huart1, g_RAMSES_Sample, SAMPLE_CMD_SIZE, 50);
 		g_RAM_1_timer = HAL_GetTick();
+		g_RAM_1_data_ready = 0;
+		g_RAM_1_triggered = 1;
+
 		HAL_UART_Transmit(&huart3, g_RAMSES_Sample, SAMPLE_CMD_SIZE, 50);
 		g_RAM_2_timer = HAL_GetTick();
+		g_RAM_2_data_ready = 0;
+		g_RAM_2_triggered = 1;
 		return READY;
 	} else if (strcmp((char*)cmd->cmd, "RAMSES_1_SAMPLE") == 0)
 	{
 		printf("\t\t\t\tRAMSES_1_SAMPLE\r\n");
 		HAL_UART_Transmit(&huart1, g_RAMSES_Sample, SAMPLE_CMD_SIZE, 50);
 		g_RAM_1_timer = HAL_GetTick();
+		g_RAM_1_data_ready = 0;
+		g_RAM_1_triggered = 1;
 		return READY;
 
 	} else if (strcmp((char*)cmd->cmd, "RAMSES_2_SAMPLE") == 0)
@@ -52,6 +64,8 @@ enum State Do_Action_RAMSES(const command *cmd) {
 		printf("\t\t\t\tRAMSES_2_SAMPLE\r\n");
 		HAL_UART_Transmit(&huart3, g_RAMSES_Sample, SAMPLE_CMD_SIZE, 50);
 		g_RAM_2_timer = HAL_GetTick();
+		g_RAM_2_data_ready = 0;
+		g_RAM_2_triggered = 1;
 		return READY;
 
 	} else if (strcmp((char*)cmd->cmd, "RAMSES_1_QUERY") == 0)
@@ -59,12 +73,16 @@ enum State Do_Action_RAMSES(const command *cmd) {
 		printf("\t\t\t\tRAMSES_1_QUERY\r\n");
 		HAL_UART_Transmit(&huart1, g_RAMSES_Query, QUERY_CMD_SIZE, 50);
 		g_RAM_1_timer = HAL_GetTick();
+		g_RAM_1_data_ready = 0;
+		g_RAM_1_triggered = 1;
 		return READY;
 	} else if (strcmp((char*)cmd->cmd, "RAMSES_2_QUERY") == 0)
 	{
 		printf("\t\t\t\tRAMSES_2_QUERY\r\n");
 		HAL_UART_Transmit(&huart3, g_RAMSES_Query, QUERY_CMD_SIZE, 50);
 		g_RAM_2_timer = HAL_GetTick();
+		g_RAM_2_data_ready = 0;
+		g_RAM_2_triggered = 1;
 		return READY;
 	}
 

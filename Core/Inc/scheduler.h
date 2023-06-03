@@ -29,8 +29,8 @@
 #define SAMPLE_CMD_SIZE 8
 
 
-extern int g_RAM_1_timer;
-extern int g_RAM_2_timer;
+extern long g_RAM_1_timer;
+extern long g_RAM_2_timer;
 
 extern UART_HandleTypeDef huart2; // LTE
 extern UARTDMA_HandleTypeDef hLTE_uart2dma6;

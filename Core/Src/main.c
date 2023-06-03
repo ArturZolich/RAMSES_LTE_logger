@@ -55,7 +55,10 @@ UARTDMA_HandleTypeDef hRAM_2_uart3dma3;
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
+ADC_HandleTypeDef hadc;
+
 UART_HandleTypeDef huart4;
+UART_HandleTypeDef huart5;
 UART_HandleTypeDef huart1;
 UART_HandleTypeDef huart2;
 UART_HandleTypeDef huart3;
@@ -86,14 +89,18 @@ uint16_t g_RAM_1_data_size = 0;
 uint8_t g_RAM_1_data_ready = 0;
 uint8_t g_RAM_1_dataSize[20] = " AT+FTPPUT=2,0"; // buffer to prepare FTP for data
 uint8_t g_RAM_1_dataSizeResponse[20] = "+FTPPUT=2,0";
-int g_RAM_1_timer = 0;
+long g_RAM_1_timer = 0;
+
+uint8_t g_RAM_1_triggered = 0;
 
 uint8_t g_RAM_2_data_latest[BUFFER_SIZE] = {};
 uint16_t g_RAM_2_data_size = 0;
 uint8_t g_RAM_2_data_ready = 0;
 uint8_t g_RAM_2_dataSize[20] = " AT+FTPPUT=2,0"; // buffer to prepare FTP for data
 uint8_t g_RAM_2_dataSizeResponse[20] = "+FTPPUT=2,0";
-int g_RAM_2_timer = 0;
+long g_RAM_2_timer = 0;
+
+uint8_t g_RAM_2_triggered = 0;
 
 
 
@@ -433,7 +440,7 @@ command LTE_ftp_put_RAM_1_data_size = {
 };
 
 command LTE_ftp_put_RAM_2_data_size = {
-		.cmd = g_dataSize,
+		.cmd = g_RAM_2_dataSize,
 		.length = 0, // zero indicate's it's a char. LTE_Send function handles it automatically
 		.good_answer = g_RAM_2_dataSizeResponse,
 		.timeout = 4000,
@@ -464,6 +471,45 @@ command LTE_ftp_put_RAM_2_data = { // sizeof will not work here
 		.retry_counter = 0
 };
 
+command LTE_ftp_put_RAM_1_preamble_size = {
+		.cmd = (uint8_t*)"AT+FTPPUT=2,7\r\n",
+		.length = 0, // zero indicate's it's a char. LTE_Send function handles it automatically
+		.good_answer = (uint8_t*)"+FTPPUT: 2,7",
+		.timeout = 5000,
+		.bad_answer = (uint8_t*)"ERROR",
+		.act_on_error = RESET_PROCESSOR,
+		.retry_counter = 0
+};
+
+command LTE_ftp_put_RAM_1_preamble = {
+		.cmd = (uint8_t*)"#+RAM_1",
+		.length = 0, // zero indicate's it's a char. LTE_Send function handles it automatically
+		.good_answer = (uint8_t*)"+FTPPUT: 1,1,1360",
+		.timeout = 4000,
+		.bad_answer = (uint8_t*)"ERROR",
+		.act_on_error = RESET_PROCESSOR,
+		.retry_counter = 0
+};
+
+command LTE_ftp_put_RAM_2_preamble_size = {
+		.cmd = (uint8_t*)"AT+FTPPUT=2,7\r\n",
+		.length = 0, // zero indicate's it's a char. LTE_Send function handles it automatically
+		.good_answer = (uint8_t*)"+FTPPUT: 2,7",
+		.timeout = 5000,
+		.bad_answer = (uint8_t*)"ERROR",
+		.act_on_error = RESET_PROCESSOR,
+		.retry_counter = 0
+};
+
+command LTE_ftp_put_RAM_2_preamble = {
+		.cmd = (uint8_t*)"#+RAM_2",
+		.length = 0, // zero indicate's it's a char. LTE_Send function handles it automatically
+		.good_answer = (uint8_t*)"+FTPPUT: 1,1,1360",
+		.timeout = 4000,
+		.bad_answer = (uint8_t*)"ERROR",
+		.act_on_error = RESET_PROCESSOR,
+		.retry_counter = 0
+};
 
 
 
@@ -477,6 +523,8 @@ static void MX_USART2_UART_Init(void);
 static void MX_UART4_Init(void);
 static void MX_USART1_UART_Init(void);
 static void MX_USART3_UART_Init(void);
+static void MX_ADC_Init(void);
+static void MX_UART5_Init(void);
 /* USER CODE BEGIN PFP */
 
 #ifdef __GNUC__
@@ -534,11 +582,19 @@ int main(void)
 	MX_UART4_Init();
 	MX_USART1_UART_Init();
 	MX_USART3_UART_Init();
+	MX_ADC_Init();
+	MX_UART5_Init();
 	/* USER CODE BEGIN 2 */
 
 	UARTDMA_Init(&hLTE_uart2dma6, &huart2); // receives LTE modem serial
 	UARTDMA_Init(&hRAM_1_uart1dma5, &huart1); // receives RAMSES 1 serial
 	UARTDMA_Init(&hRAM_2_uart3dma3, &huart3); // receives RAMSES 2 serial
+
+	HAL_GPIO_WritePin(LED_1_GPIO_Port, LED_1_Pin, SET);
+	HAL_GPIO_WritePin(LED_2_GPIO_Port, LED_2_Pin, SET);
+	HAL_GPIO_WritePin(LED_3_GPIO_Port, LED_3_Pin, SET);
+
+
 
 	/* USER CODE END 2 */
 
@@ -588,9 +644,11 @@ int main(void)
 	action_list[12] = LTE_set_dns;
 
 	action_list[13] = RAM_1_query;
-	action_list[14] = RAM_1_query;/// WARNING ZOLICH RAM 2!!!!!!
 
-	action_list[15] = LTE_get_position;
+	action_list[14] = LTE_get_position;
+
+	action_list[15] = RAM_2_query;
+
 	action_list[16] = LTE_get_time;
 
 	action_list[17] = LTE_ftp_quit;
@@ -608,42 +666,64 @@ int main(void)
 	action_list[28] = LTE_ftp_put_data_size;
 	action_list[29] = LTE_ftp_put_data;
 
+	action_list[30] = LTE_ftp_put_RAM_1_preamble_size;
+	action_list[31] = LTE_ftp_put_RAM_1_preamble;
 
-	action_list[30] = LTE_ftp_put_RAM_1_data_size;
-	action_list[31] = LTE_ftp_put_RAM_1_data;
-
-	action_list[32] = LTE_ftp_put_RAM_1_data_size;   /// WARNING ZOLICH RAM 2!!!!!!
+	action_list[32] = LTE_ftp_put_RAM_1_data_size;
 	action_list[33] = LTE_ftp_put_RAM_1_data;
 
-	action_list[34] = LTE_ftp_end_put;
+	action_list[34] = LTE_ftp_put_RAM_2_preamble_size;
+	action_list[35] = LTE_ftp_put_RAM_2_preamble;
+
+	action_list[36] = LTE_ftp_put_RAM_2_data_size;
+	action_list[37] = LTE_ftp_put_RAM_2_data;
+
+	action_list[38] = LTE_ftp_end_put;
+
+
+	action_list[39] = RAM_1_sample;
+
+	action_list[40] = LTE_get_position;
+
+	action_list[41] = RAM_2_sample;
+
+	action_list[42] = LTE_get_time;
+
 
 	// sample loop cycle below
 
-	action_list[35] = RAM_1_sample;
-	action_list[36] = RAM_1_sample;/// WARNING ZOLICH RAM 2!!!!!!
 
+	action_list[43] = LTE_ftp_start_put;
+	action_list[44] = LTE_ftp_put_data_size;
+	action_list[45] = LTE_ftp_put_data;
 
-	action_list[37] = LTE_get_position;
-	action_list[38] = LTE_get_time;
+	action_list[46] = LTE_ftp_put_RAM_1_preamble_size;
+	action_list[47] = LTE_ftp_put_RAM_1_preamble;
 
+	action_list[48] = LTE_ftp_put_RAM_1_data_size;
+	action_list[49] = LTE_ftp_put_RAM_1_data;
 
-	action_list[39] = LTE_ftp_start_put;
-	action_list[40] = LTE_ftp_put_data_size;
-	action_list[41] = LTE_ftp_put_data;
+	action_list[50] = LTE_ftp_put_RAM_2_preamble_size;
+	action_list[51] = LTE_ftp_put_RAM_2_preamble;
 
-	action_list[42] = LTE_ftp_put_RAM_1_data_size;
-	action_list[43] = LTE_ftp_put_RAM_1_data;
+	action_list[52] = LTE_ftp_put_RAM_2_data_size;
+	action_list[53] = LTE_ftp_put_RAM_2_data;
 
-	action_list[44] = LTE_ftp_put_RAM_1_data_size;   /// WARNING ZOLICH RAM 2!!!!!!
-	action_list[45] = LTE_ftp_put_RAM_1_data;
+	action_list[54] = LTE_ftp_end_put;
 
-	action_list[46] = LTE_ftp_end_put;
+	// get new data
+	action_list[55] = RAM_1_sample; 				// list ends with request for new data. A new cycle should be triggered when both RAMSESEs sends data
 
-	action_list[47] = LTE_reset_action;
+	action_list[56] = LTE_get_position;
 
+	action_list[57] = RAM_2_sample;
 
-	uint8_t last_action = 47; // number of the last action we want to execute
-	uint8_t cycle_start_action = 35; // number of the last action we want to execute
+	action_list[58] = LTE_get_time;
+
+	action_list[59] = LTE_reset_action;
+
+	uint8_t last_action = 59; // number of the last action we want to execute
+	uint8_t cycle_start_action = 43; // number of the last action we want to execute
 
 
 
@@ -685,19 +765,35 @@ int main(void)
 	hRAM_1_uart1dma5.UartTransferCompleted = 0;
 	hRAM_2_uart3dma3.UartTransferCompleted = 0;
 
+	uint8_t ftp_flag = 0;
+
+
 	while (1)
 	{
 
-		if(current_action > last_action){
+		if(current_action > last_action){ // wait with a cycle, until RAMSES data is ready
+			if(g_RAM_1_data_ready == 1 && g_RAM_2_data_ready == 1){
+				current_action = cycle_start_action; // WARNING, the end of the list must trigger RAMSES measurements (or RAMSES timeout)
+			}else{
+				current_action = last_action;
+			}
 			Clear_Array(g_LTE_ParseBuffer, BUFFER_SIZE);
-			current_action = cycle_start_action;
 		}
 
+		if(action_list[current_action].cmd == LTE_ftp_quit.cmd){ // ftp connection process starts, start blinking blue led.
+			ftp_flag = 1;
+		}
 
-		if((resolution % 50) == 0){
+		if((resolution % 50) == 0){ // reducing UI speed
 			//printf("TRYING: >>%s<<\r\n", action_list[current_action].cmd);
 			printf("TRYING: >>%d<<\r\n", current_action);
+
+			if(ftp_flag == 1){
+				HAL_GPIO_TogglePin(LED_2_GPIO_Port, LED_2_Pin); //  ftp connection process starts, start blinking blue led.
+			}
 		}
+
+
 
 		enum State state = Do_Action(action_list[current_action], g_LTE_ParseBuffer);
 		resolution++;
@@ -710,8 +806,19 @@ int main(void)
 			//HAL_UART_Transmit(&huart1, query, SAMPLE_CMD_SIZE, 500);
 			//HAL_UART_Transmit(&huart3, sam, SAMPLE_CMD_SIZE, 500);
 
+
+			HAL_GPIO_WritePin(LED_3_GPIO_Port, LED_3_Pin, SET); // Good answer - turn off yellow LED
+
+			if(action_list[current_action].cmd == LTE_ftp_put_data.cmd){
+				HAL_GPIO_WritePin(LED_2_GPIO_Port, LED_2_Pin, RESET);
+				ftp_flag = 2;
+			}
+
 			//printf("%s - %s\r\n", action_list[current_action].cmd, action_list[current_action].good_answer);
 			printf("\tREPLY: >>%s<<\r\n", (char*)g_LTE_ParseBuffer);
+
+			// printf("\t\t\tTIME: >>%d<<\r\n", HAL_GetTick());
+
 			Do_Action(LTE_reset_action, g_LTE_ParseBuffer);
 			current_action++;
 			HAL_Delay(action_list[current_action].timeout / 2);
@@ -735,13 +842,33 @@ int main(void)
 				HAL_Delay(5000);
 				startup++;
 			}
+
+			if(action_list[current_action].cmd == LTE_ftp_put_data.cmd){ // turn off Blue LED, since ftp failed
+				HAL_GPIO_WritePin(LED_2_GPIO_Port, LED_2_Pin, SET);
+				ftp_flag = 3;
+			}
+
+
 			Do_Action(LTE_reset_action, (uint8_t*)g_LTE_ParseBuffer);
+
+			if(action_list[current_action].cmd != LTE_sim_check_active.cmd){ // the sim active command can timeout, because modem is off by default
+				HAL_GPIO_WritePin(LED_1_GPIO_Port, LED_1_Pin, RESET); // TIMEOUT - turn on red LED
+			}
+
 
 			HAL_Delay(action_list[current_action].timeout);
 			current_action=0;
 			resolution = 0;
 			break;
 		case BAD_ANSWER:
+
+			HAL_GPIO_WritePin(LED_3_GPIO_Port, LED_3_Pin, RESET); // Bad answer - turn on yellow LED
+
+			if(action_list[current_action].cmd == LTE_ftp_put_data.cmd){ // turn off Blue LED, since ftp failed
+				HAL_GPIO_WritePin(LED_2_GPIO_Port, LED_2_Pin, SET);
+				ftp_flag = 3;
+			}
+
 			printf("%s - %s\r\n", action_list[current_action].cmd, action_list[current_action].bad_answer);
 			Do_Action(LTE_reset_action, (uint8_t*)g_LTE_ParseBuffer);
 			HAL_Delay(action_list[current_action].timeout);
@@ -767,8 +894,8 @@ int main(void)
 			//uint8_t* LinePointer = g_RAM_1_data_latest;
 
 			while((tmpByte = UARTDMA_GetCharFromBuffer(&hRAM_1_uart1dma5)) != -1){ // it use a feature that I read 8 bit data, so I can use 16bit negative to detect end of queue
-			//	*LinePointer = (uint8_t) tmpByte;
-			//	LinePointer++;
+				//	*LinePointer = (uint8_t) tmpByte;
+				//	LinePointer++;
 				//printf("\t\t\t\tRAMSES_1: >>%c<<\r\n", (char)tmpByte);
 				printf("\t\t\t\t\tRAMSES_1: >>%d<<\r\n", count);
 				g_RAM_1_data_latest[count]= (uint8_t)tmpByte;
@@ -799,15 +926,63 @@ int main(void)
 		{
 			printf("\t\t\t\tRAMSES_2\r\n");
 
+			int tmpByte;
+			int count = 0;
+			//uint8_t* LinePointer = g_RAM_1_data_latest;
+
+			while((tmpByte = UARTDMA_GetCharFromBuffer(&hRAM_2_uart3dma3)) != -1){ // it use a feature that I read 8 bit data, so I can use 16bit negative to detect end of queue
+				//	*LinePointer = (uint8_t) tmpByte;
+				//	LinePointer++;
+				//printf("\t\t\t\tRAMSES_1: >>%c<<\r\n", (char)tmpByte);
+				printf("\t\t\t\t\tRAMSES_2: >>%d<<\r\n", count);
+				g_RAM_2_data_latest[count]= (uint8_t)tmpByte;
+				count++;
+			}
+			//g_RAM_1_data_latest[count]= '\0';
+			printf("\t\t\t\tRAMSES_2: >>%d<<\r\n", count);
+
+			g_RAM_2_data_size = count;
+
+			char save[100] = "AT+FTPPUT=2,";
+			char len[10];
+			itoa(g_RAM_2_data_size, len, 10);
+			strcat(save, len);
+			strcat(save, "\r\n");
+
+			strcpy((char*)g_RAM_2_dataSize, save);
+
+			char save2[100] = "+FTPPUT: 2,";
+			strcat(save2, len);
+
+			strcpy((char*)g_RAM_2_dataSizeResponse, save2);
+
+			g_RAM_2_data_ready = 1;
+
 		}
 
 
-		if((g_RAM_1_timer + RAMSES_TIMEOUT) > HAL_GetTick()){
+		if(g_RAM_1_triggered == 1 && ((g_RAM_1_timer + RAMSES_TIMEOUT) < HAL_GetTick())){
 			// RAMSES timeout
 			// if no response, report timeout
+			printf("\t\t\t\tRAMSES_1 TIMEOUT\r\n");
+			strcpy((char*)g_RAM_1_data_latest, "#+RAM_1_TIMEOUT");
+			strcpy((char*)g_RAM_1_dataSize, "AT+FTPPUT=2,15\r\n");
+			strcpy((char*)g_RAM_1_dataSizeResponse, "+FTPPUT: 2,15");
+
+			g_RAM_1_data_ready = 1;
+			g_RAM_1_triggered = 0;
 		}
-		if((g_RAM_2_timer + RAMSES_TIMEOUT) > HAL_GetTick()){
+
+		if(g_RAM_2_triggered == 1 && ((g_RAM_2_timer + RAMSES_TIMEOUT) < HAL_GetTick())){
 			// RAMSES timeout
+			printf("\t\t\t\tRAMSES_2 TIMEOUT\r\n");
+
+			strcpy((char*)g_RAM_2_data_latest, "#+RAM_2_TIMEOUT");
+			strcpy((char*)g_RAM_2_dataSize, "AT+FTPPUT=2,15\r\n");
+			strcpy((char*)g_RAM_2_dataSizeResponse, "+FTPPUT: 2,15");
+
+			g_RAM_2_data_ready = 1;
+			g_RAM_2_triggered = 0;
 		}
 
 
@@ -965,6 +1140,61 @@ void SystemClock_Config(void)
 }
 
 /**
+ * @brief ADC Initialization Function
+ * @param None
+ * @retval None
+ */
+static void MX_ADC_Init(void)
+{
+
+	/* USER CODE BEGIN ADC_Init 0 */
+
+	/* USER CODE END ADC_Init 0 */
+
+	ADC_ChannelConfTypeDef sConfig = {0};
+
+	/* USER CODE BEGIN ADC_Init 1 */
+
+	/* USER CODE END ADC_Init 1 */
+
+	/** Configure the global features of the ADC (Clock, Resolution, Data Alignment and number of conversion)
+	 */
+	hadc.Instance = ADC1;
+	hadc.Init.ClockPrescaler = ADC_CLOCK_ASYNC_DIV1;
+	hadc.Init.Resolution = ADC_RESOLUTION_12B;
+	hadc.Init.DataAlign = ADC_DATAALIGN_RIGHT;
+	hadc.Init.ScanConvMode = ADC_SCAN_DISABLE;
+	hadc.Init.EOCSelection = ADC_EOC_SEQ_CONV;
+	hadc.Init.LowPowerAutoWait = ADC_AUTOWAIT_DISABLE;
+	hadc.Init.LowPowerAutoPowerOff = ADC_AUTOPOWEROFF_DISABLE;
+	hadc.Init.ChannelsBank = ADC_CHANNELS_BANK_A;
+	hadc.Init.ContinuousConvMode = DISABLE;
+	hadc.Init.NbrOfConversion = 1;
+	hadc.Init.DiscontinuousConvMode = DISABLE;
+	hadc.Init.ExternalTrigConv = ADC_SOFTWARE_START;
+	hadc.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_NONE;
+	hadc.Init.DMAContinuousRequests = DISABLE;
+	if (HAL_ADC_Init(&hadc) != HAL_OK)
+	{
+		Error_Handler();
+	}
+
+	/** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
+	 */
+	sConfig.Channel = ADC_CHANNEL_0;
+	sConfig.Rank = ADC_REGULAR_RANK_1;
+	sConfig.SamplingTime = ADC_SAMPLETIME_4CYCLES;
+	if (HAL_ADC_ConfigChannel(&hadc, &sConfig) != HAL_OK)
+	{
+		Error_Handler();
+	}
+	/* USER CODE BEGIN ADC_Init 2 */
+
+	/* USER CODE END ADC_Init 2 */
+
+}
+
+/**
  * @brief UART4 Initialization Function
  * @param None
  * @retval None
@@ -994,6 +1224,39 @@ static void MX_UART4_Init(void)
 	/* USER CODE BEGIN UART4_Init 2 */
 
 	/* USER CODE END UART4_Init 2 */
+
+}
+
+/**
+ * @brief UART5 Initialization Function
+ * @param None
+ * @retval None
+ */
+static void MX_UART5_Init(void)
+{
+
+	/* USER CODE BEGIN UART5_Init 0 */
+
+	/* USER CODE END UART5_Init 0 */
+
+	/* USER CODE BEGIN UART5_Init 1 */
+
+	/* USER CODE END UART5_Init 1 */
+	huart5.Instance = UART5;
+	huart5.Init.BaudRate = 115200;
+	huart5.Init.WordLength = UART_WORDLENGTH_8B;
+	huart5.Init.StopBits = UART_STOPBITS_1;
+	huart5.Init.Parity = UART_PARITY_NONE;
+	huart5.Init.Mode = UART_MODE_TX_RX;
+	huart5.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+	huart5.Init.OverSampling = UART_OVERSAMPLING_16;
+	if (HAL_UART_Init(&huart5) != HAL_OK)
+	{
+		Error_Handler();
+	}
+	/* USER CODE BEGIN UART5_Init 2 */
+
+	/* USER CODE END UART5_Init 2 */
 
 }
 
@@ -1132,9 +1395,13 @@ static void MX_GPIO_Init(void)
 	__HAL_RCC_GPIOH_CLK_ENABLE();
 	__HAL_RCC_GPIOA_CLK_ENABLE();
 	__HAL_RCC_GPIOB_CLK_ENABLE();
+	__HAL_RCC_GPIOD_CLK_ENABLE();
 
 	/*Configure GPIO pin Output Level */
 	HAL_GPIO_WritePin(GPIOA, LD2_Pin|GPIO_PIN_6, GPIO_PIN_RESET);
+
+	/*Configure GPIO pin Output Level */
+	HAL_GPIO_WritePin(GPIOB, LED_1_Pin|LED_2_Pin|LED_3_Pin, GPIO_PIN_RESET);
 
 	/*Configure GPIO pin : B1_Pin */
 	GPIO_InitStruct.Pin = B1_Pin;
@@ -1148,6 +1415,13 @@ static void MX_GPIO_Init(void)
 	GPIO_InitStruct.Pull = GPIO_NOPULL;
 	GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
 	HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+	/*Configure GPIO pins : LED_1_Pin LED_2_Pin LED_3_Pin */
+	GPIO_InitStruct.Pin = LED_1_Pin|LED_2_Pin|LED_3_Pin;
+	GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+	GPIO_InitStruct.Pull = GPIO_NOPULL;
+	GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+	HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
 }
 
