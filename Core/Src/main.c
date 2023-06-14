@@ -961,7 +961,7 @@ int main(void)
 		}
 
 
-		if(g_RAM_1_triggered == 1 && ((g_RAM_1_timer + RAMSES_TIMEOUT) < HAL_GetTick())){
+		if(g_RAM_1_triggered == 1 && ((g_RAM_1_timer + RAMSES_TIMEOUT) < HAL_GetTick()) && g_RAM_1_data_ready == 0){
 			// RAMSES timeout
 			// if no response, report timeout
 			printf("\t\t\t\tRAMSES_1 TIMEOUT\r\n");
@@ -973,7 +973,7 @@ int main(void)
 			g_RAM_1_triggered = 0;
 		}
 
-		if(g_RAM_2_triggered == 1 && ((g_RAM_2_timer + RAMSES_TIMEOUT) < HAL_GetTick())){
+		if(g_RAM_2_triggered == 1 && ((g_RAM_2_timer + RAMSES_TIMEOUT) < HAL_GetTick()) && g_RAM_2_data_ready == 0){
 			// RAMSES timeout
 			printf("\t\t\t\tRAMSES_2 TIMEOUT\r\n");
 

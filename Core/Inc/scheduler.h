@@ -27,6 +27,7 @@
 
 #define QUERY_CMD_SIZE 8
 #define SAMPLE_CMD_SIZE 8
+#define SAMPLE_RADIANCE_CMD_SIZE 16
 
 
 extern long g_RAM_1_timer;

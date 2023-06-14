@@ -9,6 +9,9 @@
 const uint8_t g_RAMSES_Query[] = { 0x23, 0x00, 0x00, 0x80, 0xB0, 0x00, 0x00, 0x01 };
 const uint8_t g_RAMSES_Sample[] = { 0x23, 0x00, 0x00, 0x00, 0xA8, 0x00, 0x81, 0x01 };
 
+
+const uint8_t g_RAMSES_RADIANCE_Sample[] = { 0x23, 0x00, 0x00, 0x30, 0x78, 0x05, 0x00, 0x01, 0x23, 0x00, 0x00, 0x80, 0xA8, 0x00, 0x81, 0x01 };
+
 extern uint8_t g_RAM_1_data_ready;
 extern uint8_t g_RAM_2_data_ready;
 
@@ -40,7 +43,7 @@ enum State Do_Action_RAMSES(const command *cmd) {
 	// DO RAMSES ACTION
 	if (strcmp((char*)cmd->cmd, "RAMSES_1_2_SAMPLE") == 0)
 	{
-		HAL_UART_Transmit(&huart1, g_RAMSES_Sample, SAMPLE_CMD_SIZE, 50);
+		HAL_UART_Transmit(&huart1, g_RAMSES_RADIANCE_Sample, SAMPLE_RADIANCE_CMD_SIZE, 50);
 		g_RAM_1_timer = HAL_GetTick();
 		g_RAM_1_data_ready = 0;
 		g_RAM_1_triggered = 1;
@@ -53,7 +56,7 @@ enum State Do_Action_RAMSES(const command *cmd) {
 	} else if (strcmp((char*)cmd->cmd, "RAMSES_1_SAMPLE") == 0)
 	{
 		printf("\t\t\t\tRAMSES_1_SAMPLE\r\n");
-		HAL_UART_Transmit(&huart1, g_RAMSES_Sample, SAMPLE_CMD_SIZE, 50);
+		HAL_UART_Transmit(&huart1, g_RAMSES_RADIANCE_Sample, SAMPLE_RADIANCE_CMD_SIZE, 50);
 		g_RAM_1_timer = HAL_GetTick();
 		g_RAM_1_data_ready = 0;
 		g_RAM_1_triggered = 1;
